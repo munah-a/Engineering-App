@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CoastalEngineer Pro - Advanced Coastal Structure Design</title>
+    <meta name="description"
+        content="Professional coastal engineering software for breakwater design, wave analysis, and structural calculations">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <!-- KaTeX for formula rendering -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+</head>
+
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <div class="brand-icon">
+                    <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+                        <path d="M4 16C4 16 8 8 16 8C24 8 28 16 28 16C28 16 24 24 16 24C8 24 4 16 4 16Z"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                        <circle cx="16" cy="16" r="3" fill="currentColor" />
+                    </svg>
+                </div>
+                <span class="brand-text">CoastalEngineer Pro</span>
+            </div>
+            <div class="nav-links">
+                <button class="nav-link active" data-page="dashboard">Dashboard</button>
+                <button class="nav-link" data-page="library">Library</button>
+                <button class="nav-link" data-page="wave-predictor">Wave Analysis</button>
+                <button class="nav-link" data-page="designer">Structure Design</button>
+                <button class="nav-link" data-page="serviceability">Serviceability</button>
+                <button class="nav-link" data-page="reports">Reports</button>
+            </div>
+            <div class="nav-actions">
+                <button class="btn-secondary" id="unitToggle">
+                    <span class="unit-indicator">Metric</span>
+                </button>
+                <button class="btn-primary" id="exportPDF">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                        <path d="M8 11V3M8 11L5 8M8 11L11 8M3 13H13" stroke="currentColor" stroke-width="1.5"
+                            stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                    Export PDF
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-container">
+        <!-- Dashboard Page -->
+        <div class="page active" id="dashboard">
+            <div class="page-header">
+                <h1>Welcome to CoastalEngineer Pro</h1>
+                <p>Advanced coastal structure design and analysis platform</p>
+            </div>
+
+            <!-- Recent Projects Section -->
+            <div class="dashboard-section">
+                <div class="section-header">
+                    <h2>Recent Projects</h2>
+                    <button class="btn-secondary" data-navigate="library">
+                        View All
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                            <path d="M6 4L10 8L6 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                stroke-linejoin="round" />
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="recent-projects-grid" id="recentProjectsGrid">
+                    <!-- Dynamic content will be inserted here -->
+                    <div class="empty-library-state">
+                        <div class="empty-icon">📚</div>
+                        <h3>No Projects Yet</h3>
+                        <p>Start by analyzing wave conditions for your project</p>
+                        <button class="btn-primary" data-navigate="wave-predictor">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                                <path d="M8 3V13M3 8H13" stroke="currentColor" stroke-width="2"
+                                    stroke-linecap="round" />
+                            </svg>
+                            Start New Project
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Calculation Modules Section -->
+            <div class="dashboard-section">
+                <div class="section-header">
+                    <h2>Calculation Modules</h2>
+                </div>
+
+                <div class="feature-grid">
+                    <div class="feature-card" data-navigate="wave-predictor">
+                        <div class="feature-icon wave-icon">🌊</div>
+                        <h3>Wave Predictor</h3>
+                        <p>Fetch-limited wave growth, depth-limited breaking calculations, and design water levels</p>
+                        <ul class="feature-list">
+                            <li>SMB & JONSWAP models</li>
+                            <li>Miche & Goda criteria</li>
+                            <li>DWL with SLR</li>
+                        </ul>
+                    </div>
+
+                    <div class="feature-card" data-navigate="designer-rubble">
+                        <div class="feature-icon rubble-icon">🏔️</div>
+                        <h3>Rubble Mound Design</h3>
+                        <p>Complete stability analysis using Hudson and Van der Meer formulae</p>
+                        <ul class="feature-list">
+                            <li>Armour layer sizing</li>
+                            <li>Material database</li>
+                            <li>Filter layer design</li>
+                        </ul>
+                    </div>
+
+                    <div class="feature-card" data-navigate="designer-vertical">
+                        <div class="feature-icon vertical-icon">🏢</div>
+                        <h3>Vertical Structures</h3>
+                        <p>Goda pressure analysis, stability checks, and caisson optimization</p>
+                        <ul class="feature-list">
+                            <li>Wave pressure (Goda)</li>
+                            <li>Stability analysis</li>
+                            <li>Foundation design</li>
+                        </ul>
+                    </div>
+
+                    <div class="feature-card" data-navigate="designer">
+                        <div class="feature-icon designer-icon">📐</div>
+                        <h3>Cross-Section Designer</h3>
+                        <p>Visual template-based design with real-time calculations</p>
+                        <ul class="feature-list">
+                            <li>Template library</li>
+                            <li>Interactive editing</li>
+                            <li>Auto-sizing tools</li>
+                        </ul>
+                    </div>
+
+                    <div class="feature-card" data-navigate="serviceability">
+                        <div class="feature-icon service-icon">⚠️</div>
+                        <h3>Serviceability Analysis</h3>
+                        <p>EurOtop overtopping calculations and safety assessments</p>
+                        <ul class="feature-list">
+                            <li>Mean discharge (q)</li>
+                            <li>Wave volume (Vmax)</li>
+                            <li>Safety thresholds</li>
+                        </ul>
+                    </div>
+
+                    <div class="feature-card" data-navigate="reports">
+                        <div class="feature-icon report-icon">📄</div>
+                        <h3>Engineering Reports</h3>
+                        <p>Professional PDF export with formulas and diagrams</p>
+                        <ul class="feature-list">
+                            <li>LaTeX formulas</li>
+                            <li>Auto-calculations</li>
+                            <li>Custom branding</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Wave Predictor Page -->
+        <div class="page" id="wave-predictor">
+            <div class="page-header">
+                <h1>Wave Predictor</h1>
+                <p>Comprehensive wave analysis and design water level calculations</p>
+            </div>
+
+            <div class="calculator-layout">
+                <div class="input-panel">
+                    <div class="panel-section">
+                        <h3>Fetch-Limited Wave Growth</h3>
+                        <div class="form-group">
+                            <label data-tooltip="wind-speed">Wind Speed (U₁₀) <span
+                                    class="tooltip-icon">ⓘ</span></label>
+                            <div class="input-with-unit">
+                                <input type="number" id="windSpeed" value="15" step="0.1">
+                                <span class="unit">m/s</span>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label data-tooltip="fetch-length">Fetch Length (F) <span
+                                    class="tooltip-icon">ⓘ</span></label>
+                            <div class="input-with-unit">
+                                <input type="number" id="fetchLength" value="5000" step="100">
+                                <span class="unit">m</span>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label data-tooltip="offshore-depth">Offshore Depth (d₀) <span
+                                    class="tooltip-icon">ⓘ</span></label>
+                            <div class="input-with-unit">
+                                <input type="number" id="offshoreDepth" value="30" step="0.1">
+                                <span class="unit">m</span>
+                            </div>
+                            <small class="help-text">Water depth where waves are generated</small>
+                        </div>
+                        <div class="form-group">
+                            <label data-tooltip="toe-depth">Toe Depth (d<sub>toe</sub>) <span
+                                    class="tooltip-icon">ⓘ</span></label>
+                            <div class="input-with-unit">
+                                <input type="number" id="toeDepthWave" value="5" step="0.1">
+                                <span class="unit">m</span>
+                            </div>
+                            <small class="help-text">Water depth at structure toe</small>
+                        </div>
+                        <div class="form-group">
+                            <label data-tooltip="wave-angle">Wave Approach Angle (β₀) <span
+                                    class="tooltip-icon">ⓘ</span></label>
+                            <div class="input-with-unit">
+                                <input type="number" id="waveAngle" value="0" step="1" min="0" max="90">
+                                <span class="unit">°</span>
+                            </div>
+                            <small class="help-text">0° = shore-normal, affects refraction</small>
+                        </div>
+                        <div class="form-group">
+                            <label>Method</label>
+                            <select id="waveMethod">
+                                <option value="smb">SMB (Shore Protection Manual)</option>
+                                <option value="jonswap" selected>JONSWAP</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="panel-section">
+                        <h3>Design Water Level (DWL)</h3>
+                        <div class="form-group">
+                            <label data-tooltip="tide-station">Tide Station <span class="tooltip-icon">ⓘ</span></label>
+                            <select id="tideStation">
+                                <option value="manual">Manual / User Defined</option>
+                                <option value="male">Male (Stn 108)</option>
+                                <option value="gan">Gan (Stn 109)</option>
+                                <option value="hanimaadhoo">Hanimaadhoo (Stn 117)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label data-tooltip="mean-sea-level">Mean Sea Level (MSL) <span
+                                    class="tooltip-icon">ⓘ</span></label>
+                            <div class="input-with-unit">
+                                <input type="number" id="msl" value="0" step="0.01">
+                                <span class="unit">m</span>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label data-tooltip="tidal-range">Tidal Range <span class="tooltip-icon">ⓘ</span></label>
+                            <div class="input-with-unit">
+                                <input type="number" id="tidalRange" value="2.5" step="0.1">
+                                <span class="unit">m</span>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label data-tooltip="sea-level-rise">Sea Level Rise (SLR) <span
+                                    class="tooltip-icon">ⓘ</span></label>
+                            <div class="input-with-unit">
+                                <input type="number" id="slr" value="0.5" step="0.1">
+                                <span class="unit">m</span>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label data-tooltip="wave-setup">Wave Setup (η) <span class="tooltip-icon">ⓘ</span></label>
+                            <div class="input-with-unit">
+                                <input type="number" id="waveSetup" value="0" step="0.01" readonly>
+                                <span class="unit">m</span>
+                            </div>
+                            <small class="help-text">Calculated automatically</small>
+                        </div>
+                    </div>
+
+                    <button class="btn-primary btn-large" id="calculateWaves">Calculate Wave Parameters</button>
+                </div>
+
+                <div class="results-panel">
+                    <div class="results-card">
+                        <h3>Offshore Wave Characteristics</h3>
+                        <div class="result-item">
+                            <span class="result-label" data-tooltip="significant-wave-height">Offshore Hs <span
+                                    class="tooltip-icon">ⓘ</span></span>
+                            <span class="result-value" id="resultHs">--</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label" data-tooltip="peak-period">Peak Period (Tp) <span
+                                    class="tooltip-icon">ⓘ</span></span>
+                            <span class="result-value" id="resultTp">--</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label">Offshore Wavelength (L₀)</span>
+                            <span class="result-value" id="resultL">--</span>
+                        </div>
+                    </div>
+
+                    <div class="results-card">
+                        <h3>Toe Wave Conditions</h3>
+                        <div class="result-item highlight">
+                            <span class="result-label">Toe Wave Height (H<sub>toe</sub>)</span>
+                            <span class="result-value" id="resultHtoe">--</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label">Shoaling Coeff (Ks)</span>
+                            <span class="result-value" id="resultKs">--</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label">Refraction Coeff (Kr)</span>
+                            <span class="result-value" id="resultKr">--</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label">Depth Limited</span>
+                            <span class="result-value" id="resultDepthLimited">--</span>
+                        </div>
+                    </div>
+
+                    <div class="results-card">
+                        <h3>Wave Run-up & Surf Similarity</h3>
+                        <div class="result-item highlight">
+                            <span class="result-label">Surf Similarity (ξ)</span>
+                            <span class="result-value" id="resultXi">--</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label">Breaking Type</span>
+                            <span class="result-value" id="resultBreakingType">--</span>
+                        </div>
+                        <div class="result-item highlight">
+                            <span class="result-label">Wave Run-up (Ru)</span>
+                            <span class="result-value" id="resultRunup">--</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label">Run-down (Rd)</span>
+                            <span class="result-value" id="resultRundown">--</span>
+                        </div>
+                    </div>
+
+                    <div class="results-card">
+                        <h3>Design Water Level</h3>
+                        <div class="result-item">
+                            <span class="result-label">High Tide Level</span>
+                            <span class="result-value" id="resultHTL">--</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label">Wave Setup</span>
+                            <span class="result-value" id="resultSetup">--</span>
+                        </div>
+                        <div class="result-item highlight">
+                            <span class="result-label" data-tooltip="design-water-level">Design Water Level (DWL) <span
+                                    class="tooltip-icon">ⓘ</span></span>
+                            <span class="result-value" id="resultDWL">--</span>
+                        </div>
+                    </div>
+
+                    <div class="formula-card">
+                        <h4>Applied Formulas</h4>
+                        <div class="formula" id="formulaDisplay">
+                            <!-- Formulas will be rendered here with KaTeX -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Structure Designer Page -->
+        <div class="page" id="designer">
+            <div class="page-header">
+                <h1>Cross-Section Designer</h1>
+                <p>Interactive template-based structure design</p>
+            </div>
+
+            <div class="designer-layout">
+                <div class="template-selector-header">
+                    <div class="form-group" style="max-width: 400px; margin: 0 auto 20px;">
+                        <label for="structureTemplateSelect">Select Structure Type</label>
+                        <select id="structureTemplateSelect" class="form-control"
+                            style="font-size: 1rem; padding: 12px;">
+                            <option value="" disabled selected>Choose a template...</option>
+                            <optgroup label="Rubble Mound">
+                                <option value="rubble-standard">🏔️ Standard Breakwater</option>
+                                <option value="rubble-bullnose">🧱 Rubble Mound with Bullnose</option>
+                                <option value="rubble-berm">🌊 Berm Breakwater</option>
+                                <option value="rubble-low">📉 Low-Crested</option>
+                                <option value="rubble-revetment">🏖️ Revetment</option>
+                            </optgroup>
+                            <optgroup label="Vertical Structures">
+                                <option value="vertical-wall">🏢 Vertical Wall</option>
+                                <option value="vertical-composite">🏗️ Composite</option>
+                                <option value="vertical-caisson">📦 Caisson</option>
+                                <option value="vertical-perforated">⬜ Perforated</option>
+                            </optgroup>
+                            <optgroup label="Custom">
+                                <option value="custom">✏️ Create Custom</option>
+                            </optgroup>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="design-workspace" style="width: 100%;">
+                    <div class="canvas-container">
+                        <canvas id="designCanvas" width="800" height="400"></canvas>
+                        <div class="canvas-controls">
+                            <button class="canvas-btn" id="zoomIn">+</button>
+                            <button class="canvas-btn" id="zoomOut">-</button>
+                            <button class="canvas-btn" id="resetView">⟲</button>
+                        </div>
+                    </div>
+
+                    <div class="design-parameters">
+                        <h3>Structure Parameters</h3>
+                        <div id="parameterInputs">
+                            <!-- Dynamic inputs based on selected template -->
+                        </div>
+                        <button class="btn-primary btn-large" id="analyzeStructure">Analyze Structure</button>
+                        <button class="btn-secondary btn-large" id="saveToLibrary"
+                            style="margin-top: var(--spacing-md);">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                                <path d="M12 5L6 11L3 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round" />
+                            </svg>
+                            Save to Library
+                        </button>
+                    </div>
+                </div>
+
+                <div class="design-results">
+                    <div class="results-tabs">
+                        <button class="tab-btn active" data-tab="stability">Stability</button>
+                        <button class="tab-btn" data-tab="materials">Materials</button>
+                        <button class="tab-btn" data-tab="layers">Layers</button>
+                    </div>
+                    <div class="tab-content active" id="stability">
+                        <div id="stabilityResults"></div>
+                    </div>
+                    <div class="tab-content" id="materials">
+                        <div id="materialsInfo"></div>
+                    </div>
+                    <div class="tab-content" id="layers">
+                        <div id="layersInfo"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Structure Library Page -->
+        <div class="page" id="library">
+            <div class="page-header">
+                <h1>Structure Library</h1>
+                <p>Manage, browse, and reuse your coastal structure designs</p>
+            </div>
+
+            <div class="library-layout">
+                <!-- Toolbar -->
+                <div class="library-toolbar">
+                    <div class="search-bar">
+                        <input type="text" id="librarySearch"
+                            placeholder="Search structures by name, project, or tags...">
+                        <button class="btn-icon" id="searchBtn">
+                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                                <circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="2" />
+                                <path d="M12 12L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    <div class="filter-group">
+                        <select id="filterType">
+                            <option value="all">All Types</option>
+                            <option value="rubble-standard">Standard Rubble Mound</option>
+                            <option value="rubble-berm">Berm Breakwater</option>
+                            <option value="rubble-reef">Reef Breakwater</option>
+                            <option value="rubble-low">Low-Crested</option>
+                            <option value="vertical-wall">Vertical Wall</option>
+                            <option value="vertical-composite">Composite</option>
+                            <option value="vertical-caisson">Caisson</option>
+                            <option value="vertical-perforated">Perforated</option>
+                        </select>
+
+                        <select id="filterStatus">
+                            <option value="all">All Status</option>
+                            <option value="draft">Draft</option>
+                            <option value="approved">Approved</option>
+                            <option value="archived">Archived</option>
+                        </select>
+
+                        <select id="sortBy">
+                            <option value="dateModified">Last Modified</option>
+                            <option value="dateCreated">Date Created</option>
+                            <option value="name">Name (A-Z)</option>
+                            <option value="type">Type</option>
+                        </select>
+                    </div>
+
+                    <div class="action-buttons">
+                        <button class="btn-secondary" id="importBtn">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                                <path d="M8 3V11M8 3L5 6M8 3L11 6M3 13H13" stroke="currentColor" stroke-width="1.5"
+                                    stroke-linecap="round" />
+                            </svg>
+                            Import
+                        </button>
+                        <button class="btn-secondary" id="exportLibraryBtn">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                                <path d="M8 11V3M8 11L5 8M8 11L11 8M3 13H13" stroke="currentColor" stroke-width="1.5"
+                                    stroke-linecap="round" />
+                            </svg>
+                            Export All
+                        </button>
+                        <button class="btn-primary" id="createNewStructure">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                                <path d="M8 3V13M3 8H13" stroke="currentColor" stroke-width="2"
+                                    stroke-linecap="round" />
+                            </svg>
+                            New Structure
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Structure Grid -->
+                <div class="structure-grid" id="structureGrid">
+                    <!-- Structures will be dynamically loaded here -->
+                    <div class="empty-state" id="emptyState">
+                        <svg width="80" height="80" viewBox="0 0 80 80" fill="none">
+                            <circle cx="40" cy="40" r="30" stroke="currentColor" stroke-width="2" opacity="0.3" />
+                            <path d="M40 25V55M25 40H55" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" />
+                        </svg>
+                        <h3>No Structures Found</h3>
+                        <p>Create your first coastal structure design or import existing ones</p>
+                        <button class="btn-primary" onclick="document.getElementById('createNewStructure').click()">
+                            Create New Structure
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Serviceability Page -->
+        <div class="page" id="serviceability">
+            <div class="page-header">
+                <h1>Serviceability Analysis</h1>
+                <p>Overtopping discharge and safety assessment using EurOtop guidelines</p>
+            </div>
+
+            <div class="calculator-layout">
+                <div class="input-panel">
+                    <div class="panel-section">
+                        <h3>Structure Geometry</h3>
+                        <div class="form-group">
+                            <label data-tooltip="crest-freeboard">Crest Freeboard (Rc) <span
+                                    class="tooltip-icon">ⓘ</span></label>
+                            <div class="input-with-unit">
+                                <input type="number" id="freeboard" value="3.0" step="0.1">
+                                <span class="unit">m</span>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label data-tooltip="structure-slope">Slope Angle (α) <span
+                                    class="tooltip-icon">ⓘ</span></label>
+                            <div class="input-with-unit">
+                                <input type="number" id="slopeAngle" value="35" step="1">
+                                <span class="unit">°</span>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label data-tooltip="crest-width">Crest Width (Gc) <span
+                                    class="tooltip-icon">ⓘ</span></label>
+                            <div class="input-with-unit">
+                                <input type="number" id="crestWidth" value="5.0" step="0.1">
+                                <span class="unit">m</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="panel-section">
+                        <h3>Wave Conditions</h3>
+                        <div class="form-group">
+                            <label data-tooltip="significant-wave-height">Significant Wave Height (Hm0) <span
+                                    class="tooltip-icon">ⓘ</span></label>
+                            <div class="input-with-unit">
+                                <input type="number" id="waveHeight" value="2.5" step="0.1">
+                                <span class="unit">m</span>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Mean Wave Period (Tm)</label>
+                            <div class="input-with-unit">
+                                <input type="number" id="wavePeriod" value="8.0" step="0.1">
+                                <span class="unit">s</span>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Water Depth at Toe</label>
+                            <div class="input-with-unit">
+                                <input type="number" id="toeDepth" value="10.0" step="0.1">
+                                <span class="unit">m</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button class="btn-primary btn-large" id="calculateOvertopping">Calculate Overtopping</button>
+                </div>
+
+                <div class="results-panel">
+                    <div class="results-card">
+                        <h3>Overtopping Results</h3>
+                        <div class="result-item highlight">
+                            <span class="result-label">Mean Discharge (q)</span>
+                            <span class="result-value" id="resultQ">--</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label">Individual Wave Volume (Vmax)</span>
+                            <span class="result-value" id="resultVmax">--</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label">Overtopping Rate</span>
+                            <span class="result-value" id="resultRate">--</span>
+                        </div>
+                    </div>
+
+                    <div class="safety-assessment">
+                        <h3>Safety Assessment</h3>
+                        <div class="safety-indicator" id="pedestrianSafety">
+                            <div class="safety-icon">🚶</div>
+                            <div class="safety-info">
+                                <h4>Pedestrians</h4>
+                                <div class="safety-status">--</div>
+                                <div class="safety-limit">Limit: 0.01 l/s/m</div>
+                            </div>
+                        </div>
+                        <div class="safety-indicator" id="vehicleSafety">
+                            <div class="safety-icon">🚗</div>
+                            <div class="safety-info">
+                                <h4>Vehicles</h4>
+                                <div class="safety-status">--</div>
+                                <div class="safety-limit">Limit: 0.05 l/s/m</div>
+                            </div>
+                        </div>
+                        <div class="safety-indicator" id="buildingSafety">
+                            <div class="safety-icon">🏢</div>
+                            <div class="safety-info">
+                                <h4>Buildings</h4>
+                                <div class="safety-status">--</div>
+                                <div class="safety-limit">Limit: 1.0 l/s/m</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="formula-card" id="serviceabilityDetailedCalc" style="margin-top: 20px; display: none;">
+                        <h4>Detailed Calculation</h4>
+                        <div class="formula" id="overtoppingFormulas">
+                            <!-- Detailed formulas will be rendered here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Reports Page -->
+        <div class="page" id="reports">
+            <div class="page-header">
+                <h1>Engineering Reports</h1>
+                <p>Generate professional PDF reports with calculations and diagrams</p>
+            </div>
+
+            <div class="report-layout">
+                <div class="report-config">
+                    <h3>Report Configuration</h3>
+
+                    <div class="form-group">
+                        <label>Project Name</label>
+                        <input type="text" id="projectName" placeholder="Enter project name">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Project Location</label>
+                        <input type="text" id="projectLocation" placeholder="Enter location">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Engineer Name</label>
+                        <input type="text" id="engineerName" placeholder="Enter your name">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Company</label>
+                        <input type="text" id="companyName" placeholder="Enter company name">
+                    </div>
+
+                    <h4>Include Sections</h4>
+                    <div class="checkbox-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" checked id="includeWave">
+                            <span>Wave Analysis</span>
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" checked id="includeStructure">
+                            <span>Structure Design</span>
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" checked id="includeService">
+                            <span>Serviceability</span>
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" checked id="includeFormulas">
+                            <span>Calculation Formulas</span>
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" checked id="includeDiagrams">
+                            <span>Cross-Section Diagrams</span>
+                        </label>
+                    </div>
+
+                    <button class="btn-primary btn-large" id="generateReport">Generate PDF Report</button>
+                </div>
+
+                <div class="report-preview">
+                    <h3>Report Preview</h3>
+                    <div class="preview-container" id="reportPreview">
+                        <div class="preview-page">
+                            <h2>Coastal Engineering Report</h2>
+                            <p class="preview-subtitle">Professional Design Documentation</p>
+                            <div class="preview-content">
+                                <p><strong>Configure your report settings and click "Generate PDF Report" to create your
+                                        engineering documentation.</strong></p>
+                                <p>The report will include:</p>
+                                <ul>
+                                    <li>Executive summary with key findings</li>
+                                    <li>Detailed wave analysis calculations</li>
+                                    <li>Structure stability assessments</li>
+                                    <li>Serviceability analysis results</li>
+                                    <li>All formulas in proper mathematical notation</li>
+                                    <li>Cross-section diagrams and visualizations</li>
+                                    <li>Material specifications and quantities</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Project Creation Wizard Modal -->
+    <div class="modal" id="projectWizardModal" style="display: none;">
+        <div class="modal-content wizard-modal">
+            <div class="wizard-header">
+                <h2 id="wizardTitle">Create New Project</h2>
+                <button class="modal-close" id="closeWizardModal">&times;</button>
+            </div>
+
+            <div class="wizard-progress-bar">
+                <div class="wizard-progress-fill" id="wizardProgress" style="width: 20%;"></div>
+            </div>
+            <div class="wizard-progress-text" id="wizardProgressText">Step 1 of 5</div>
+
+            <div class="wizard-body">
+                <div id="wizardStepContent">
+                    <!-- Step content will be dynamically injected here -->
+                </div>
+            </div>
+
+            <div class="wizard-footer">
+                <button class="btn-secondary" id="wizardPrevBtn" style="display: none;">
+                    ← Previous
+                </button>
+                <button class="btn-primary" id="wizardNextBtn">
+                    Next →
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Unit Converter Modal -->
+    <div class="modal" id="unitModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Unit Preferences</h2>
+                <button class="modal-close" id="closeUnitModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="unit-selector">
+                    <label class="radio-label">
+                        <input type="radio" name="unitSystem" value="metric" checked>
+                        <span>Metric (SI)</span>
+                    </label>
+                    <label class="radio-label">
+                        <input type="radio" name="unitSystem" value="imperial">
+                        <span>Imperial</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Load in proper order: dependencies first -->
+    <script src="scripts/tooltip-system.js?v=2"></script>
+    <script src="scripts/global-parameters.js?v=4"></script>
+    <script src="scripts/project-manager.js?v=2"></script>
+    <script src="scripts/project-ui.js?v=5"></script>
+    <script src="scripts/structure-library.js?v=2"></script>
+    <script src="scripts/library-ui.js?v=2"></script>
+    <script src="scripts/enhanced-forms.js?v=2"></script>
+    <script src="scripts/wave-transformation.js?v=1"></script>
+    <script src="scripts/calculations.js?v=22"></script>
+    <script src="scripts/structure-calculations.js?v=1"></script>
+    <script src="scripts/structure-analysis.js?v=1"></script>
+    <script src="scripts/canvas.js?v=16"></script>
+    <script src="scripts/pdf-export.js?v=7"></script>
+    <script src="scripts/project-wizard.js?v=1"></script>
+    <script src="scripts/main.js?v=13"></script>
+</body>
+
+</html>
