@@ -1,0 +1,684 @@
+
+================================================================================
+--- PAGE 1 ---
+================================================================================
+
+Rubble Mound Breakwater Design Example 
+Given: 
+Design Conditions 
+Water depth: 5.5 m 
+Beach slope: 1:20 
+Design high water: 1.7 m 
+Design wave Hs = 2 m 
+H1/10 = 2.5 m 
+Tm = 8 sec 
+Lo = 100 m 
+Allowable overtopping: 0.4 m3/sec/m 
+Armor unit: rough quarry stone 
+ 
+Soil data: 
+ 
+0 m   
+5.5 m SM 
+(sand) 
+fine to medium 
+loose γ = 17 kN/m3 
+φ = 30° 
+c = 0 
+21.5 m CH 
+(clay) 
+soft 
+over-consolidated γ = 14 kN/m3 
+φ = 0° 
+c = 50 kPa 
+eo = 2.2 
+k = 10-5 cm/s 
+av = 3x10-3 m2/kN 
+Cc = 0.3 
+limestone 
+ 
+ 
+
+
+================================================================================
+--- PAGE 2 ---
+================================================================================
+
+B 
+ crown/cap ocean side bay/harbor si de crest 
+armor la yer, W 
+hc R first un derla yer 
+DHW 
+SWL α hb αb  
+h  second underla yer  t 
+toe 
+core/base
+bedding and/or filter Bt 
+Assume : 
+Armor and underlayer mate rial is quarry stone: γa = 2.5 t/m3 
+Structu re slope: 1:2 
+Structu re will be symm etric (th is may be cha nged to reduce structure size in necessary) 
+ 
+Specify Design Condition : 
+SWL = 5.5 m, DHW = 1.7 m  Æ h = 5.5 + 1.7 = 7.2 m  
+h = 7.2 m  
+Assum e listed conditions ar e at structure toe.  
+Hs = H 1/3 = 2 m   
+T = 8 sec 
+Lo = 100 m   
+
+
+
+π
+
+π=
+
+πhL2tanhL2gT22
+ at h = 7.2  
+Lm = 62 m  
+Calculate depth lim ited breaking wave height  at structure site, com pare with the 
+unbroken storm  wave height, and use the lesser of the two as the design wave 
+Hb/hb ~ 0.78 Æ  
+at DHW : Hb = 0.78×7.2 = 5.6 m  
+at SW L: H b = 0.78×5.5 = 4.3 m  • 
+• Alternate methods in C EM II-4 
+Both wave heights in (1) are greater than H s Æ  
+waves are not breaking and design H = H s = 2 m 
+H = 2 m  
+
+
+================================================================================
+--- PAGE 3 ---
+================================================================================
+
+Set BW Dimensions (controlled by height & slope) : 
+Set-up : wav es are no t breaking per the previous calc Æ no set-up 
+NOTE: there will be a set-down , but this will be negl ected an d considered  an 
+added factor of safety unless requi red to reduce the structure size 
+0=η 
+Overtopping  Discharge (CEM VI-5, pp. 19-33) 
+using the O wen m odel(Table VI-5-8): 
+
+
+
+γ− =
+rm
+msbRexpaTgHq*
+ where 
+π=2s
+HRRm
+s*
+m  is the relative f reeboard   
+2
+ms
+os
+mTH
+g2
+LHsπ= =  Æ 2
+ms
+s*
+mgTH
+HRR=  • 
+from  Table V I-5-8: 
+slope 1:2 Æ a = 0.013, b = 22  
+rock rip rap > 2D  thick Æ γr ~ 0.55 • 
+• solving:  
+041.0828.9 013.04.0ln2255.0
+T agHqlnbR
+msr *
+m =
+×× ×−=
+
+
+γ−=  
+m 45.1288.9041.02HgTRHR2
+s2
+m *
+ms =××= =  
+Rovertop = 1.4 5 m 
+Run-up  based on surf zone param eter at the structure, using CEM equation VI-5-13 
+Coefficients  from  VI-5-5: 2% run -up Æ A = 0.96, B = 1.17, C = 0.46, D = 1.97 • 
+• (D/B)1/C = (1.97/1.17)(1/0.46) = 3.1, from  above ξm = 2.7 
+ for 1.5 < ξm ≤ (D/B)1/C C
+m S %i,u B H R ξ=  
+ ( ) 85.1 7.217.1 B H R46.0 C
+m S %2,u = =ξ=  
+Reduced Run-up assum e 11155.0
+anglewave
+watershallow berm
+roughnesssurface ××× = γ γγ γ  
+( ) 1 55.085.1
+anglewave
+watershallow berm
+roughnesssurface H R H RS %2,u S uR = × = γ γγ γ =  • 
+R = H s = 2m • 
+Rrun-up = 2 m 
+
+
+================================================================================
+--- PAGE 4 ---
+================================================================================
+
+Choose the run-up requirem ent (purpose has not been specified, sim pler) 
+actual overtopping 0565.088.92
+22
+gTH
+HRR2 2
+ms
+s*
+m =×= =  
+()()() msec//m 2.055.00565.022exp828.9013.0bRexpT agHq3
+r*
+m
+ms ≈ ×− =
+
+
+
+γ− =  • 
+R = 2 m  
+q = 0.2 m3/sec/m  
+Settlem ent: m ust be dete rmined later Æ assum e ρtotal = 0.1 m  
+ρtotal = 0.1 m 
+Design elevation = DHW + η + R + ρtotal = 7.2 + 0 + 2 + 0.1 = 9.3 m  
+h + R = 9.3 m 
+ 
+BW Dimension Summary: 
+Assum ed 
+structure is s ymmetric, α = αb • 
+• 
+• 
+• no set-down 
+no crown, h c = R 
+total settlem ent = 0.1 m  (adjus t later) 
+h = 7.2 m  
+h + R = 9.3 m 
+tan α = 1/2  
+ 
+Armor Unit Design : 
+Assum e Armor unit is rough quarry  stone, 2 layers, no overtopping Æ Table VI-5-22 applies  
+non-break ing waves, 0-5 % dam age, random  placem ent: K D = 4 • 
+• 
+• sg = γa/γw = (2.5 t/m3)/(1 t/m3) = 2.5 
+() ()t74.0
+215.2425.2
+cot1sgKHW33
+3
+D3
+a
+50 =
+−×=
+α −γ=  
+Table VI-5-50 gives rock sizes: W  ~ 0.77 t • 
+W50 = 0.77 t 
+Armor thick ness 
+n = 2; k ∆ = 1.0, P = 37% from  Table VI-5-51 • 
+• m 4.15.277.012Wnkt3/1 3/1
+a=××=
+
+
+
+γ=∆  
+tarmor = 1.4 m 
+
+
+================================================================================
+--- PAGE 5 ---
+================================================================================
+
+Crest width (B) (m inimum n = 3):  m 25.277.013Wk3B3/1 3/1
+a=××=
+
+
+
+γ=∆  
+B = 2 m  
+Num ber of a rmor units per unit surface area 
+() 8.277.05.237.0112W 100P1 nkAN3/2 3/2
+a a=−××=γ− =∆  
+Na/A = 2.8 units/m2 
+Volume of armor per unit leng th 
+() [] [ 9.5423.9224.1 cotRh2BtLV=× ×+ =α + + = ]  
+V/L = 54.9 m3/m 
+ 
+
+
+================================================================================
+--- PAGE 6 ---
+================================================================================
+
+Under-layer Design : 
+The goal to reduce the size of th e stone to at po int where W /wcore ≤ 15-25, where W  is the 
+stone in the layer covering the core.  Roughly, this gives a size of ~W /4000 for the core 
+Æ ½ lb ston es, with 2 in ch diam eter.  If som e other siz e is rea dily ava ilable, that m ight be 
+the goal.  M ust check to ensure th e W/wcore ≤ 15-25 is m et once th e core over-layer is 
+known. 
+Diagram  for Volum e calculations (quarry stone  is sold by unit weight & total volum e) 
+ () c2atLV+ ≈  
+()
+α + =α + =
+22 2
+cot1hcoth h c 
+( )α −α += sinT cotH2Ab  
+( )α −α += csc cotT2Aa  a A 
+α c
+h H t T 
+b 
+B 
+ 
+First Under-Layer  
+minimum two stone thick (n  = 2) • 
+• 
+• 
+• 
+• under-layer unit weight = W /10 since cover la yer and first underl ayer are both stone 
+W10 = 0.77 t/10 = 0.077 t × 1000 = 77 kg 
+next larger available size is 90.7 kg 
+thickne ss m 66.05.2091.012Wnkt3/1 3/1
+a=××=
+
+
+
+γ=∆  
+Volum e per unit length of breakwater 
+referring to diagram : 
+h = 9.2 m  – t armor = 9.2 – 1.4 = 7.8 m;  
+t = t ul1 = 0.7 m, T = t armor = 1.4 
+A = B crest = 2 m , cot α = 2 
+() () m 4.1)2.22(4.122 csc cotT2Aa = − +=α −α +=  
+m 15418.6 cot1hc2=+ =α + =  
+() ( ) mm 22 1524.17.0c2atLV 3= ×+ = + ≈  • 
+First Under-Layer  
+W10 = 91 kg 
+tul1 = 0.7 m  
+V/Lul1 = 22 m3/m 
+ 
+
+
+================================================================================
+--- PAGE 7 ---
+================================================================================
+
+Second Under-Layer  
+minimum two stone thick ( n = 2) • 
+• 
+• 
+• 
+• under-layer unit weight = W /20 of the layer above Æ W/200 of ar mor 
+W200 = 0.75 t/200 = 0.004 t × 1000 = 4 kg 
+next larger available size is 4.5 kg 
+thickne ss m 24.05.20045.012Wnkt3/1 3/1
+a=××=
+
+
+
+γ=∆  
+Volum e per unit length of breakwater  
+referring to diagram : 
+h = 9.2 m  – t armor – t ul1 = 9.2 – 1.4 – 0.7 = 6.1 m  
+t = t ul2 = 0.2 4 m, T = t ul1 = 0.7 
+A = a ul1 = 1.4 m , cot α = 2 
+() () m 1.1)2.22(7.024.1 csc cotT2Aa = − + =α −α +=  
+m 6.13411.6 cot1hc2=+ =α + =  
+() ( ) mm 8.66.1321.124.0c2atLV 3= ×+ = + ≈  • 
+Second Under-Layer  
+W200 = 4.5 kg 
+tul2 = 0.24 m  
+V/Lul1 = 6.8 m3/m 
+Core  
+dynam ic load requirem ent: 25  to15 wWcore≤  Æ W = 4.5 kg Æ  
+wcore ≥ 4.5/25 – 4.5/15 = 0.18 – 0.3 kg • 
+W4000 = 0.75 t/4000 = 0.00019 t × 1000 = 0.2 kg • 
+• 
+• next larger available size is 0.23 kg 
+thickne ss m 24.05.20045.012Wnkt3/1 3/1
+a=××=
+
+
+
+γ=∆  
+Volum e per unit length of breakwater  
+referring to diagram : 
+h = 9.2 m  – t armor – t ul1 – t ul2 = 9.2 – 1.4 – 0.7 – 0.24 = 5.9 m  
+H = h ul2 = 6.1 m , T = t ul2 = 0.24 
+A = a ul2 = 1.1 m ; cot α = 2 
+() () m 1)2.22(24.021.1 csc cotT2Aa = − + =α −α +=
+() 
+( ) m 4.242.224.021.621.1 cscT cotH2Ab = × −× + =α −α +=  
+trapezoid: () () mm 754.2419.5 bahLV 3
+21
+21= + =+ ≈  • 
+Core  
+W4000 = 0.23 kg 
+V/L = 75 m3/m 
+ 
+
+
+================================================================================
+--- PAGE 8 ---
+================================================================================
+
+Toe Design : 
+Toe Berm  Width (B t) should be the  m aximum of Bt = 2H  or  Bt = 0.4 h, and at least 3 
+stones wide:  2H = 4 m , 0.4h = 0.4×5. 5 = 2.2 m  (use lower water level) • 
+• 
+• 
+• assum e Bt = 4 m  
+assum e height of toe = 1.4 m  (guess) Æ hb = 5.5 – 1.4 = 4.1 m (use lower water level) 
+Table VI-5-45 with h b/h = 4.1/5.5 = 0.75 Æ Ns3 ~ 60 
+() () t1.0
+15.26025.2
+1sgNHW33
+3 3
+s3
+S=
+−×=
+−γ=  Æ nearest size is 136 kg = 0.14 t Æ 
+m 38.05.214.0 WD3/1 3/1
+s==
+
+
+
+γ=  Æ 2 stones height = 2×0.38 = 0.76 m < 1.4 m  
+Table VI-5-48 
+k = 2 π/Lm = 2π/62 = 0.101 m-1 Æ 2kh b = 2×0.101×5.8 = 1.17 
+()() 124.04 101.0 sin17.1 sinh17.1kBsinkh2sinhkh2K2
+t2
+bb=× = =  
+( )
+()7.421.4
+124.0124.015.1 exp8.121.4
+124.0124.013.1Hh
+KK15.1 exp8.1Hh
+KK13.1 N
+3/12
+3/1sb
+3/12
+sb
+3/1 s
+=
+
+
+
+ −− + −=
+
+
+ −− + −=
+() 
+Ns3 ~ 103 Æ () t06.0
+15.210325.2
+1sgNH
+33
+3 3
+s3
+S=
+−×=
+−γ=W  • 
+use W  = 0.14 t and recalculate with h t = 5.5 – 0.8 = 4.7 m  Æ hb/h = 4.7/5.5 = 0.85 
+this is not o n the cha rt Æ Ns3 ~ 60 Æ keep previous calculation • 
+Wtoe = 136 kg 
+hb = 4.7 m   
+ (below SWL) 
+toe height = 0.8 m  
+Bt = 4 m  
+• Toe volum e 
+assum e slope is 1:2 Æ base leng th = B t + 2(SW L-h b)cot α = 4 + 2×0.8×2 = 7.2 m  
+assum e trapezoidal Æ V/L = ( SWL-hb)(B t + base) = 0.8(4 + 7.2) = 9 m3/m 
+V/Ltoe = 9 m3/m 
+
+
+================================================================================
+--- PAGE 9 ---
+================================================================================
+
+Toe-to-Toe Width : 
+W = 2B t + 2(SW L-h b)cot αt + B + 2(h b + DHW  + R + ρ)cot α  
+= 2×4 + 2×0.8×2 + 2  + 2× (4.7 + 1.7 + 2 + 0.1) ×2 = 47.2 m 
+ 
+Filte r/Bed Design : 
+To prevent m aterial fro m leaching out: 02  to15WW
+)core(50)bed(50<  • 
+• 
+• 
+• 
+• Wcore = 0.23 kg Æ Wbed > 3.5 – 4.6 kg Æ dbed ~ 12 cm Æ cobble 
+ 
+General gu ideline s  
+for stability agains t wave attack, bedding Layer thickness sho uld be:  
+o 2-3 tim es the diam eter for larg e ston e 
+o 10 cm  for coarse sand 
+o 20 cm  for gravel 
+• For foundation stability Bedding Layer th ickness should be at least 2 feet 
+• Bedding Layer should extend 5 feet horiz ontally beyond the toe cover stone. 
+ 
+Bedding layer should be 0.6 m  thick, d 50 ~ 12 cm (cobble) 
+Extent: toe-to-toe width + 2×1.5 m  = 47.2 + 3 = 50.2 m  
+ 
+
+
+================================================================================
+--- PAGE 10 ---
+================================================================================
+
+Structure Summary : 
+total height (h + R):     9.3 m 
+slope (tan α ):    1:2 
+Crest Width (B):   2 m 
+Freeboard (R):    2 m 
+Estimated Overtopping (q)  0.2 m3/sec/m 
+Settlement ( ρ):   0.1 m (assumed) 
+Toe-to-Toe width:   47.2 m 
+A r m o r :      W 50 = 0.77 t 
+n = 2, t = 1.4 m 
+Na/A = 2.8 units/m2 
+V/L = 54.9 m3/m 
+First Under-Layer:   W 50 = 91 kg 
+n = 2, t = 0.7 m 
+V/L = 22 m3/m 
+Second Under-Layer:   W 50 = 4.5 kg 
+n = 2, t = 0.24 m 
+V/L = 6.8 m3/m 
+C o r e :      W 50 = 0.23 kg 
+V/L = 75 m3/m 
+T o e :      W 50 = 136 kg 
+hb = 4.7 m below SWL 
+toe height = 0.8 m 
+Bt = 4 m 
+toe base width = 7.2 m 
+V/L = 9 m3/m 
+Bedding:    W 50 = 4.5 kg 
+thickness = 0.6 m 
+horizontal length = 50.2 m 
+V/L = 30.1 m3/m 
+ 
+ 
+
+
+================================================================================
+--- PAGE 11 ---
+================================================================================
+
+Settle ment & Bearing Capacity: 
+BW Load  
+Volum e & Weight above SW L (dry, unsubm erged load): 
+Height = 9.3 – 5.5 = 3.8 m 
+B = 2 
+Width at WL = B + 2hcot α = 2 + 2×3.8×2 = 17.2 m  
+V/L = ½ 3.8(2 + 17.2) = 36.5 m3/m 
+Weight of material = W above W L = γ (1-P/100) V/L = 2.5 (1 – 0.37)36.5 = 57.5 t/m  
+Subm erged Volum e & Weight 
+Subm erged  
+V/Ltotal = (V/L) armor + (V/L) ul1 + (V/L )ul2 + (V/L) core +(V/L) toe + (V/L) bed 
+ = 55 + 22 + 6.8 + 75 + 9 + 30.1 = 198 m3/m 
+V/Lsubmerged = 198 – 36.5 = 162 m3/m 
+W = [γ(1 – P/100) + γw(P/100)] V/L submerged = [2. 5(1-0.37) + 1×0.37]162 
+Wbelow WL = 315 t/m  
+ 
+Total Load  
+∆σ = (W above WL  + W below WL)/(foundation width) 
+ 
+Sand Layer:  ∆σ = (57.5 + 315)/47.2 = 7.9 t/m2 
+ 
+Clay Layer Æ correct for distributio n of load through sand layer (see diagram )  
+  ∆σ = (57.5 + 315)/[47.2 + 2×(5.5-0.6)×2] = 5.5 t/m2 
+ 
+ 
+ 
+ DHW 
+SWL 
+Sand H1 
+γ' = 7 kN /m3 
+φ = 35° 
+Clay BB γ' = 4 kN /m3 
+c = 20 kPa BB + 2H 1cot φ
+ 
+ 
+ 
+
+
+================================================================================
+--- PAGE 12 ---
+================================================================================
+
+Bearing Cap acity  
+Evaluate the  ultim ate be aring c apacity, q u, for each level (very c onservative, but sim ple) 
+For saturated, subm erged soils 
+strip foundations: γ γ γ′ + + = + + = BN5.0 qN cN q qq qq c q c u  
+NOTE: This f ormula is n ot for multiple lay er soils.  This calcu lation will o nly give a 
+rough approxim ation. 
+Sand Layer :  
+γ = 17 kN/ m3, φ = 30°, c = 0 
+Terzaghi Table:  N c = 37.16, N q = 22.46, N γ = 19.13 
+Df = Foundation depth (bedding layer thickness) = 0.6 m   
+Assum e γw = 10 kN/m3 
+BW foundation width (neglect bed) = 47.2 m  
+qc = cN c = 0 
+qq = γ'DfNq = (17-10)×0.6×22.46 = 94 kN/ m2 
+qγ = ½ γ'BNγ = ½ ×(17-10) ×47.2×19.13 = 3160 kN/ m2 
+qu = 0 + 94 + 3160 = 3254 kN/ m2 = 325 t/m2 
+ 
+∆σ = 7.9 t/m2 
+FS = q u/ ∆σ = 325/15.1 = 21.5   
+FSsand = 21   
+Clay Layer :  
+γ = 14 kN/ m3, φ = 0, c = 50 kN/ m2 
+Terzaghi Table:  N c = 5.7, N q = 1, N γ = 0 
+Df = 0 
+qc = cN c = 50×5.7 = 285 kN/ m2 
+qq = γ'DfNq = 0 
+qγ = ½ γ'BNγ = 0 
+qu = 285 + 0 + 0 = 285 kN/ m2 = 28.5 t/m2 
+ 
+clay layer also supports the sand layer: ∆σsand = 0.7×4.9 t/m2 = 3.4 t/m2 
+∆σ = 5.5 t/m2 + 3.4 t/m2 = 8.9 t/m2 
+FS = q u/ ∆σ = 28.5/8.9 = 3.2   
+FSclay = 3.2   
+ 
+Prelim inary Saf ety Facto r 
+FS = 3.2   
+
+
+================================================================================
+--- PAGE 13 ---
+================================================================================
+
+Settlem ent 
+Sand Layer:   ∆σ = 7.9 t/m2 
+Clay Layer:  ∆σ = 5.5 t/m2 
+Settlem ent in Sand :  
+Assum e L/B > 10 
+Iz = I z10 = 0.2 
+depth of I zp: z = z 10 = 1.0 B Æ Z = 1 
+σ'zp = σzp – u = γ'ZB = (1.7 – 1) B = 0.7×47.2 = 33 t/m2 
+∆σ'z = q - σ'0 = 7.9 - (1.7 – 1)×0.6 = 7.5 t/m2 
+55.0335.71.05.0''1.05.0 I
+zpz
+zp = + =σσ∆+ =  
+depth of influence: z = 4B = 4×47.2 = 190 m  
+assum e one layer ∆z = 4 .9 m 
+z = 4.9/2 = 2.45 m  Æ 22.0 45.22.472.055.02.0zz2.0 I2.0I
+pzp
+z =−+ =−+ =  
+assum e qc/N60 ~ 5 bar = 50 t/m2 (see table in notes) 
+L/B = 10 Æ E = 3.5q c = 3.5×50 = 175 t/m2 
+(note: E table in notes gives E 10× higher for loose sand) 
+( )97.05.76.017.15.01''5.01 C
+Z0
+1 =
+
+ −−=
+
+
+
+σ∆σ−=   
+5.11.025 log 0.211.0t log 0.21 C10yrs
+10 2 =
+
++=
+
+
++= , assum e 25 yr life 
+ 
+m 01.09.41750.221.5 0.97 ∆zEΙCCρ i
+in
+1iz
+21 =
+
+× × = 
+
+σ∆ = ∑
+= 
+ρsand = 0.01 m   
+ 
+ 
+ 
+ 
+
+
+================================================================================
+--- PAGE 14 ---
+================================================================================
+
+Settlem ent in Clay :  
+Prim ary Consolida tion Settlem ent (ρc) 
+γ = 14 kN/ m3, φ = 0°, c = 50 kPa, e o = 2.2, k = 10-5 cm/s, a v = 3x10-3 m2/kN, C c = 0.3 
+∆σ = 5.5 t/m2 
+σ'0 = (1.7 – 1)×4.9 + ½ (1.4-1)×21.5 = 7.7 t/m2 
+assum e CR = 0.2C c = 0.06 
+Over-consolidated: m 09.07.75.57.7log2.215.2106.0
+c = +
++×−=ρ  
+Consider tim e to consolidate: 
+k = 10-5cm/s × 10-2m/cm × 3600s/hr × 24hrs/day × 365days/yr = 3.15 m /yr 
+() ( )yr/m 336103102.2115.3
+ae1kc2
+3
+vw0
+v =××+=γ+=− 
+N = 1, T v (95%) = 1.129 
+()2v
+vNHtcT=  Æ yrs 55.13365.21129.1cHTt2
+v2
+v = = =  
+Secondary Consolidation Settlem ent (ρs) 
+Assum e Cα/Cc ~ 0.03 Æ Cα ~ 0.01 
+assum e tp = 2 yrs and the breakwater lifetim e is 25 yrs 
+m 07.0225 log 2.215.1201.0
+tt log e1HCρ
+PF
+0s =
++×=
+
+
+
+
+
+
+
++=α 
+m 16.0 07.0 09.00s c i = + +=ρ+ρ+ρ/=ρ  
+ρclay = 0.16 m   
+ 
+Total Settle ment 
+ρ = ρsand + ρclay = 0.01 + 0.16 = 0.17 m 
+ρtotal = 0.17 m   
+should recalculate design with ρ ~ 0.2 m  vice 0.1 m  

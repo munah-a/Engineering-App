@@ -38,26 +38,21 @@ function calculateRevetmentStability(params) {
     const tanAlpha = Math.tan(alpha_rad);
     const xi_m = tanAlpha / Math.sqrt(waveHeight / L0);
 
-    // Van der Meer stability formulas (EurOtop 2018, Section 5.2.1)
-    // Determine wave breaking type
-    const xi_critical = Math.sqrt(tanAlpha); // Transition point
-    const isPlunging = xi_m < xi_critical;
+    // Van der Meer (1988) stability formulas (Rock Manual Eq. 5.138 / EurOtop 2018)
+    const P = Math.min(Math.max(permeability, 0.05), 0.65);
+    const S = damageLevel;
+    const N = Math.min(Math.max(stormWaves || 3000, 100), 7500);
+    const xi_critical = Math.pow(6.2 * Math.pow(P, 0.31) * Math.sqrt(tanAlpha), 1 / (P + 0.5));
+    const isPlunging = slopeLeft >= 4.0 || xi_m < xi_critical;
 
     let Hs_stable;
     let formula;
-    const P = permeability; // Notional permeability: 0.1 (impermeable) to 0.6 (very permeable)
-    const S = damageLevel; // Damage level: start of damage S=2, intermediate S=3-5, failure S=8
-    const N = stormWaves;
 
     if (isPlunging) {
-        // Plunging breakers (ξ < √tanα)
-        // Hs / (Δ × Dn50) = (6.2 × P^0.18) × (S/√N)^0.2 × ξ_m^(-0.5)
         const c_pl = 6.2 * Math.pow(P, 0.18);
         Hs_stable = Delta * armourDn50 * c_pl * Math.pow(S / Math.sqrt(N), 0.2) * Math.pow(xi_m, -0.5);
         formula = 'H_s / (\\Delta \\times D_{n50}) = 6.2 P^{0.18} (S/\\sqrt{N})^{0.2} \\xi_m^{-0.5}';
     } else {
-        // Surging breakers (ξ ≥ √tanα)
-        // Hs / (Δ × Dn50) = (1.0 × P^(-0.13)) × (S/√N)^0.2 × √cotα × ξ_m^P
         const c_su = 1.0 * Math.pow(P, -0.13);
         const cotAlpha = 1 / tanAlpha;
         Hs_stable = Delta * armourDn50 * c_su * Math.pow(S / Math.sqrt(N), 0.2) * Math.sqrt(cotAlpha) * Math.pow(xi_m, P);
@@ -85,9 +80,9 @@ function calculateRevetmentStability(params) {
         Hs_stable,
         xi_m,
         waveCondition: isPlunging ? 'Plunging' : 'Surging',
-        xi_critical: xi_critical.toFixed(2),
+        xi_critical,
         formula,
-        reference: 'EurOtop II (2018), Section 5.2.1, Equations 5.8 & 5.9',
+        reference: 'Van der Meer (1988); CIRIA Rock Manual C683 Eq. 5.138',
         warnings,
         details: {
             Delta,
@@ -100,7 +95,7 @@ function calculateRevetmentStability(params) {
 }
 
 /**
- * Calculate wave run-up on revetment (EurOtop 2018)
+ * Calculate wave run-up on revetment (EurOtop 2018 Eq. 5.1 & 5.2)
  * @param {object} params - Revetment parameters
  * @returns {object} Run-up results
  */
@@ -109,26 +104,26 @@ function calculateRevetmentRunup(params) {
         waveHeight,
         wavePeriod,
         slopeLeft,
-        depth
+        gamma_f = 0.55,
+        gamma_b = 1.0,
+        gamma_beta = 1.0
     } = params;
 
     const g = 9.81;
     const L0 = (g * wavePeriod * wavePeriod) / (2 * Math.PI);
-    const alpha_deg = Math.atan(1 / slopeLeft) * (180 / Math.PI);
-    const xi = Math.tan(alpha_deg * Math.PI / 180) / Math.sqrt(waveHeight / L0);
+    const tanAlpha = 1 / slopeLeft;
+    const xi = tanAlpha / Math.sqrt(waveHeight / L0);
 
-    // EurOtop 2018 run-up formula
-    const gamma_b = 1.0; // Breaking wave factor
-    const gamma_f = 0.9; // Roughness factor for rock
-    const gamma_beta = 1.0; // Obliquity factor
-
-    const Ru2 = 1.65 * gamma_b * gamma_f * gamma_beta * xi * waveHeight;
+    const ru_break = 1.65 * gamma_b * gamma_f * gamma_beta * xi * waveHeight;
+    const ru_max = 1.00 * gamma_f * gamma_beta * (4.0 - 1.5 / Math.sqrt(Math.max(0.1, gamma_b * xi))) * waveHeight;
+    const Ru2 = Math.max(0.1 * waveHeight, Math.min(ru_break, ru_max));
 
     return {
         Ru2,
         xi,
-        formula: 'Ru2% / Hs = 1.65 × γb × γf × γβ × ξm-1,0',
-        reference: 'EurOtop II (2018), Section 5.2'
+        gamma_f,
+        formula: 'R_{u2\\%} / H_{m0} = \\min(1.65\\gamma_b\\gamma_f\\gamma_\\beta\\xi_{m-1,0},\\; 1.00\\gamma_f\\gamma_\\beta(4.0 - 1.5/\\sqrt{\\gamma_b\\xi_{m-1,0}}))',
+        reference: 'EurOtop II (2018), Section 5.2 (Eqs. 5.1 & 5.2)'
     };
 }
 
@@ -137,57 +132,144 @@ function calculateRevetmentRunup(params) {
 // ==========================================
 
 /**
- * Calculate berm breakwater stability (Van der Meer for reshaping)
- * @param {object} params - Berm breakwater parameters
- * @returns {object} Stability results
+ * Calculate berm breakwater stability and recession (Torum / Van der Meer)
+ * @param {object} params - Berm breakwater parameters (bermElevation relative to SWL)
+ * @returns {object} Stability and recession results
  */
 function calculateBermStability(params) {
     const {
         armourDn50,
         matDensity,
-        slopeLeft,
         bermWidth,
-        bermElevation,
-        recession,
-        permeability = 0.4,
-        damageLevel = 0.5, // Nod - number of displaced units
+        bermElevation = 1.0,
+        recession = 5.0,
         waveHeight,
-        depth
+        wavePeriod = 10.0,
+        depth = 5.0
     } = params;
 
+    const g = 9.81;
     const rho_w = 1025;
     const Delta = (matDensity - rho_w) / rho_w;
 
-    // Berm submergence
-    const hb = depth - bermElevation;
+    // Effective vertical berm parameter guarded against zero or negative elevation relative to SWL
+    const bermDepth = Math.max(0.1 * waveHeight, Math.abs(bermElevation));
 
-    // Stability number for reshaping structures (EurOtop 2018, Section 5.2.3)
-    const Ns = waveHeight / (Delta * armourDn50);
+    // Dimensionless stability number Ho and period parameter Ho*To
+    const Ho = waveHeight / (Delta * armourDn50);
+    const To = wavePeriod * Math.sqrt(g / armourDn50);
+    const HoTo = Ho * To;
 
-    // Van der Meer for berm breakwaters
-    const Nod = damageLevel;
-    const Ns_allowed = 1.0 * Math.pow(Nod, 0.15) * Math.pow(hb / waveHeight, 0.5);
+    // Van der Meer / Torum recession estimate (m)
+    const rec_dn50 = HoTo > 16
+        ? Math.max(0, 2.7e-6 * Math.pow(HoTo, 3) + 9e-6 * Math.pow(HoTo, 2) + 0.11 * HoTo - 1.8)
+        : 0;
+    const recession_expected = rec_dn50 * armourDn50;
+    const requiredBermWidth = Math.max(3 * waveHeight, recession_expected + 2 * armourDn50);
 
-    const stabilityRatio = Ns_allowed / Ns;
-    const passed = stabilityRatio >= 1.0;
+    // Hardly reshaping / statically stable threshold Ho <= 2.7 and adequate berm width
+    const Ho_allowed = 2.7;
+    const stabilityRatio = Ho_allowed / Math.max(0.01, Ho);
+    const widthOk = bermWidth >= requiredBermWidth && bermWidth >= recession_expected;
+    const passed = Ho <= Ho_allowed && widthOk && recession_expected <= recession;
 
     return {
         stabilityRatio,
         passed,
-        Ns,
-        Ns_allowed,
-        recession_expected: recession,
-        formula: 'Ns = Hs / (Δ × Dn50) = 1.0 × Nod^0.15 × (hb/Hs)^0.5',
-        reference: 'EurOtop II (2018), Section 5.2.3; CEM VI-5-47',
-        note: 'Berm breakwaters are designed to reshape under storm conditions'
+        Ns: Ho,
+        Ho,
+        HoTo,
+        Ns_allowed: Ho_allowed,
+        bermDepth,
+        depth,
+        recession_expected,
+        recession_allowed: recession,
+        requiredBermWidth,
+        widthOk,
+        formula: 'H_o = \\frac{H_s}{\\Delta D_{n50}} \\le 2.7, \\quad \\frac{Rec}{D_{n50}} = 2.7\\times 10^{-6}(H_o T_o)^3 + 9\\times 10^{-6}(H_o T_o)^2 + 0.11 H_o T_o - 1.8',
+        reference: 'Rock Manual (2007) Section 5.2.6; Torum (1998); EurOtop II (2018)',
+        note: Ho <= 2.0 ? 'Icelandic-type statically stable berm' : Ho <= 2.7 ? 'Hardly reshaping berm breakwater' : 'Reshaping berm — check recession vs berm width'
     };
 }
 
+// ==========================================
+// REEF / SUBMERGED BREAKWATER CALCULATIONS
+// ==========================================
 
+/**
+ * Calculate wave transmission & stability for a reef / submerged breakwater
+ * References: d'Angremond et al. (1996), Van der Meer et al. (2005), Ahrens (1989)
+ * @param {object} params - Reef breakwater parameters
+ * @returns {object} Transmission and stability results
+ */
+function calculateReefTransmission(params) {
+    const {
+        waveHeight,
+        wavePeriod = 8.0,
+        depth,
+        structureHeight,
+        crestWidth,
+        slopeLeft = 1.5,
+        armourDn50 = 1.0,
+        matDensity = 2650,
+        waterDensity = 1025
+    } = params;
+
+    const g = 9.81;
+    const Rc = structureHeight - depth; // Negative when submerged below SWL
+    const L0 = (g * wavePeriod * wavePeriod) / (2 * Math.PI);
+    const xi = (1 / slopeLeft) / Math.sqrt(Math.max(1e-5, waveHeight / L0));
+
+    // d'Angremond et al. (1996) wave transmission formula clamped to [0.075, 0.80]
+    const rawKt = -0.4 * (Rc / waveHeight) +
+        0.64 * Math.pow(Math.max(0.1, crestWidth / waveHeight), -0.31) * (1 - Math.exp(-0.5 * xi));
+    const Kt = Math.max(0.075, Math.min(0.80, rawKt));
+    const Ht = Kt * waveHeight;
+    const energyAttenuation = (1 - Kt * Kt) * 100;
+
+    // Reef armour stability (spectral stability number / depth-adjusted Hudson)
+    const Delta = (matDensity - waterDensity) / waterDensity;
+    const submergenceRatio = Rc / waveHeight;
+    const Ns_reef = 2.0 * Math.exp(Math.max(-0.5, -0.3 * submergenceRatio));
+    const Dn50_required = waveHeight / (Delta * Ns_reef);
+    const passed = armourDn50 >= Dn50_required;
+
+    return {
+        Rc,
+        xi,
+        Kt,
+        Ht,
+        energyAttenuation,
+        Dn50_required,
+        armourDn50,
+        stabilityRatio: armourDn50 / Math.max(0.01, Dn50_required),
+        passed,
+        isSubmerged: Rc < 0,
+        formula: "K_t = -0.4 \\frac{R_c}{H_s} + 0.64 \\left(\\frac{B}{H_s}\\right)^{-0.31}(1 - e^{-0.5\\xi}) \\in [0.075, 0.80]",
+        reference: "d'Angremond et al. (1996); Van der Meer et al. (2005); Ahrens (1989)"
+    };
+}
 
 // ==========================================
 // LOW-CRESTED BREAKWATER CALCULATIONS
 // ==========================================
+
+/**
+ * Resolve EurOtop overtopping function safely in both browser and Node.js
+ */
+function _getEurOtopFn() {
+    if (typeof calculateEurOtopOvertopping === 'function') {
+        return calculateEurOtopOvertopping;
+    }
+    if (typeof require === 'function') {
+        try {
+            return require('./calculations.js').calculateEurOtopOvertopping;
+        } catch (e) {
+            return null;
+        }
+    }
+    return null;
+}
 
 /**
  * Calculate overtopping and transmission for low-crested breakwater
@@ -199,167 +281,167 @@ function calculateLowCrestedPerformance(params) {
         crestHeight,
         crestWidth,
         waveHeight,
-        wavePeriod,
-        slopeLeft,
-        slopeRight,
-        depth
+        wavePeriod = 8.0,
+        slopeLeft = 1.5,
+        hasBullnose = false,
+        bullnoseFactor = 0.7,
+        gamma_f = 0.55
     } = params;
 
     const g = 9.81;
     const Rc = crestHeight;
     const Gc = crestWidth;
     const Hs = waveHeight;
+    const alphaDeg = (Math.atan(1 / slopeLeft) * 180) / Math.PI;
+    const gamma_v = hasBullnose ? bullnoseFactor : 1.0;
 
-    // Overtopping for low-crested structures (EurOtop 2018, Chapter 5/7)
-    // If emerged (Rc > 0), use standard EurOtop formulas (now updated to 2018 in calculations.js)
-    // If zero freeboard or submerged, overtopping transitions to transmission/overflow
-    let q;
+    const eurOtopFn = _getEurOtopFn();
+    let q_l_s_m = 0;
+    let xi = (1 / slopeLeft) / Math.sqrt(Hs / ((g * wavePeriod * wavePeriod) / (2 * Math.PI)));
 
-    if (typeof calculateEurOtopOvertopping !== 'undefined' && Rc > 0) {
-        // Use the centralized 2018 formula
-        q = calculateEurOtopOvertopping(Rc, Hs, wavePeriod, slopeLeft);
+    if (eurOtopFn) {
+        const ot = eurOtopFn(Hs, wavePeriod, Rc, alphaDeg, gamma_f, 1.0, 1.0, gamma_v, Gc);
+        q_l_s_m = ot.q_l_s_m;
+        xi = ot.xi_m10;
     } else {
-        // Fallback or Submerged/Zero Freeboard (Simplified)
-        // EurOtop 2018 Eq 5.11 for non-breaking as a baseline
-        const gamma_f = 0.9;
-        const q_dimensionless = 0.09 * Math.exp(-Math.pow(1.5 * Math.abs(Rc) / (Hs * gamma_f), 1.3));
-        q = q_dimensionless * Math.sqrt(g * Math.pow(Hs, 3)) * 1000;
-
-        // Note: For submerged structures, one should look at transmission primarily
+        const q_dim = Rc <= 0
+            ? Math.min((0.023 / Math.sqrt(1 / slopeLeft)) * xi, 0.09)
+            : Math.min(
+                (0.023 / Math.sqrt(1 / slopeLeft)) * xi * Math.exp(-Math.pow((2.7 * Math.max(0, Rc)) / (xi * Hs * gamma_f * gamma_v), 1.3)),
+                0.09 * Math.exp(-Math.pow((1.5 * Math.max(0, Rc)) / (Hs * gamma_f * gamma_v), 1.3))
+            );
+        q_l_s_m = q_dim * Math.sqrt(g * Math.pow(Hs, 3)) * 1000;
     }
 
-    // Transmission
-    const L0 = (g * wavePeriod * wavePeriod) / (2 * Math.PI);
-    const xi = Math.tan(Math.atan(1 / slopeLeft)) / Math.sqrt(Hs / L0);
-    const Kt = 0.4 * (Rc / Hs) + 0.64 * Math.pow(Gc / Hs, -0.31) * (1 - Math.exp(-0.5 * xi));
-    const Kt_final = Math.max(0, Math.min(1, Kt));
+    // d'Angremond et al. (1996) wave transmission: Kt decreases as positive freeboard Rc increases
+    const rawKt = -0.4 * (Rc / Hs) + 0.64 * Math.pow(Math.max(0.1, Gc / Hs), -0.31) * (1 - Math.exp(-0.5 * xi));
+    const Kt_final = Math.max(0.075, Math.min(0.80, rawKt));
 
     return {
+        alphaDeg,
         overtopping: {
-            q,
-            formula: 'q / √(g×Hs³) = 0.2 × exp(-2.6 × Rc/(Hs × γf))',
-            reference: 'EurOtop II (2018), Chapter 7'
+            q: q_l_s_m,
+            formula: '\\frac{q}{\\sqrt{g H_{m0}^3}} = \\min\\left(\\frac{0.023}{\\sqrt{\\tan\\alpha}}\\xi_{m-1,0} e^{-(2.7 R_c / (\\xi_{m-1,0} H_{m0}\\gamma_f\\gamma_v))^{1.3}},\\; 0.09 e^{-(1.5 R_c / (H_{m0}\\gamma_f\\gamma_v))^{1.3}}\\right)',
+            reference: 'EurOtop II (2018), Eqs. 5.10, 5.11 & 5.19'
         },
         transmission: {
             Kt: Kt_final,
             Ht: Kt_final * Hs,
-            formula: 'Kt = f(Rc/Hs, Gc/Hs, ξ)',
-            reference: 'CEM VI-5-7'
+            formula: "K_t = -0.4(R_c/H_s) + 0.64(G_c/H_s)^{-0.31}(1 - e^{-0.5\\xi})",
+            reference: "d'Angremond et al. (1996); CEM VI-5-7"
         },
-        note: 'Low-crested structures allow both overtopping and transmission'
+        note: 'Low-crested structures attenuate waves via both overtopping dissipation and transmission reduction'
     };
 }
 
 // ==========================================
-// VERTICAL WALL CALCULATIONS (GODA)
+// VERTICAL WALL CALCULATIONS (GODA 2000)
 // ==========================================
 
 /**
- * Calculate Goda wave forces on vertical wall
- * @param {object} params - Vertical wall parameters
- * @returns {object} Wave force results
+ * Calculate Goda (2000) wave forces and overturning moments on a vertical wall
+ * @param {object} params - Vertical wall parameters (wallHeight = total height above foundation)
+ * @returns {object} Wave force and pressure results
  */
 function calculateVerticalWallForces(params) {
     const {
         wallHeight,
         foundationWidth,
+        wallThickness = 3.0,
         depth,
         waveHeight,
         wavePeriod,
-        waveAngle = 0,
-        concreteDensity = 2400,
-        fillDensity = 1800
+        waveAngle = 0
     } = params;
 
     const g = 9.81;
     const rho_w = 1025;
-    const d = depth; // Water depth at structure
-    const H = waveHeight; // Design wave height (usually H1/3 or H1/250)
+    const d = depth;
     const T = wavePeriod;
-    const beta = waveAngle * Math.PI / 180; // Wave angle in radians
-    const hc = wallHeight; // Wall height above seabed
-
-    // Calculate wave length using dispersion relation
-    const L0 = (g * T * T) / (2 * Math.PI); // Deep water wavelength
-    let L = L0; // Initial guess
-    // Iterative solution for wavelength
-    for (let i = 0; i < 5; i++) {
-        L = L0 * Math.tanh(2 * Math.PI * d / L);
-    }
-
-    // Goda pressure modification factors (Goda 2000, Takahashi 2002)
-    // α1: Pressure intensity factor
-    const sinh_term = Math.sinh(4 * Math.PI * d / L);
-    const alpha1 = 0.6 + 0.5 * Math.pow((4 * Math.PI * d / L) / sinh_term, 2);
-
-    // α2: Depth-related reduction factor (Goda)
-    // Depends on mound height (hm). If wall is on seabed, hm = 0.
+    const beta = (waveAngle * Math.PI) / 180;
+    const cosBeta = Math.cos(beta);
     const moundHeight = params.foundationHeight || params.moundHeight || 0;
-    const dw = d - moundHeight; // Depth to top of mound
 
-    // Goda Formula for α2
-    // α2 = min( (1 - dw/d)/3 * (H/d)^2, 2*d/H )
-    // If moundHeight = 0, dw = d, term becomes 0.
-
-    let alpha2_val = 0;
-    if (moundHeight > 0) {
-        const term1 = ((1 - dw / d) / 3) * Math.pow(H / d, 2);
-        const term2 = 2 * d / H;
-        alpha2_val = Math.min(term1, term2);
+    // Iterative dispersion wavelength at depth d (50 iterations)
+    const L0 = (g * T * T) / (2 * Math.PI);
+    let L = L0;
+    for (let i = 0; i < 50; i++) {
+        const nextL = L0 * Math.tanh((2 * Math.PI * d) / L);
+        if (Math.abs(nextL - L) < 1e-6) {
+            L = nextL;
+            break;
+        }
+        L = nextL;
     }
-    const alpha2 = alpha2_val;
 
-    // α3: Pressure at seabed
-    const cosh_term = Math.cosh(2 * Math.PI * d / L);
-    const alpha3 = 1 - (hc / d) * (1 - 1 / cosh_term);
+    // Goda (2000) depth & mound geometry
+    const dw = moundHeight > 0 ? Math.max(0.2, d - moundHeight) : d;
+    const d_prime = dw;
+    const hb = d + 5 * waveHeight * 0.02; // Breaking depth approx (slope 1:50)
+    const H_design = Math.min(1.8 * waveHeight, 0.78 * hb);
 
-    // Design water level elevation (Goda 2000)
-    // η* = 0.75 × (1 + cosβ) × H for normal conditions
-    const eta_star = 0.75 * (1 + Math.cos(beta)) * H;
+    // Goda pressure modification factors
+    const k4d = (4 * Math.PI * d) / L;
+    const k2d = (2 * Math.PI * d) / L;
+    const alpha1 = 0.6 + 0.5 * Math.pow(k4d / Math.sinh(k4d), 2);
+    const alpha2 = moundHeight > 0
+        ? Math.min(((hb - dw) / (3 * hb)) * Math.pow(H_design / dw, 2), (2 * dw) / H_design)
+        : 0;
+    const alpha3 = 1 - (d_prime / hb) * (1 - 1 / Math.cosh(k2d));
 
-    // Wave pressure at top of wall (SWL) - Goda formula
-    // p1 = 0.5 × (1 + cosβ) × (α1 + α2×cosβ) × ρw × g × η*
-    const p1 = 0.5 * (1 + Math.cos(beta)) * (alpha1 + alpha2 * Math.cos(beta)) * rho_w * g * eta_star / 1000; // kPa
+    // Wave crest elevation above SWL
+    const eta_star = 0.75 * (1 + cosBeta) * H_design;
 
-    // Wave pressure at seabed
-    const p3 = alpha3 * p1; // kPa
+    // Wall crest height above SWL (wallHeight is total height from foundation level to crest)
+    const hc = Math.max(0, wallHeight - d_prime);
+    const hc_star = Math.min(eta_star, hc);
 
-    // Uplift pressure at heel
-    const p4 = 0.5 * (1 + Math.cos(beta)) * alpha1 * alpha3 * rho_w * g * H / 1000; // kPa
+    // Goda pressures (kPa) — note H_design multiplies (alpha1 + alpha2 cos^2 beta)
+    const p1 = 0.5 * (1 + cosBeta) * (alpha1 + alpha2 * cosBeta * cosBeta) * (rho_w * g * H_design) / 1000;
+    const p3 = alpha3 * p1;
+    const p2 = eta_star > 0 ? p1 * Math.max(0, 1 - hc_star / eta_star) : 0;
 
-    // Total horizontal force per unit width (kN/m)
-    // Trapezoidal pressure distribution
-    const F_h = 0.5 * (p1 + p3) * eta_star;
+    // Uplift pressure at seaward toe (kPa)
+    const pu = 0.5 * (1 + cosBeta) * alpha1 * alpha3 * (rho_w * g * H_design) / 1000;
 
-    // Uplift force (kN/m)
-    const F_uplift = 0.5 * p4 * foundationWidth;
+    // Integrated horizontal force over submerged wall (d_prime) + wetted emerged wall (hc_star)
+    const F_sub = 0.5 * (p1 + p3) * d_prime;
+    const F_emerged = 0.5 * (p1 + p2) * hc_star;
+    const F_h = F_sub + F_emerged;
 
-    // Moment arm for horizontal force (from seabed)
-    const h_F = (p1 + 2 * p3) / (p1 + p3) * eta_star / 3;
+    // Overturning moment about landward heel (lever arm measured upward from wall base)
+    const M_sub = p3 * d_prime * (d_prime / 2) + 0.5 * (p1 - p3) * d_prime * ((2 * d_prime) / 3);
+    const M_emerged = p2 * hc_star * (d_prime + hc_star / 2) + 0.5 * (p1 - p2) * hc_star * (d_prime + hc_star / 3);
+    const M_overturning = M_sub + M_emerged;
 
-    // Overturning moment about toe (kNm/m)
-    const M_overturning = F_h * h_F;
+    // Uplift force & overturning moment about landward heel (triangular pressure from toe to 0 at heel -> arm = 2B/3)
+    const B_eff = foundationWidth || wallThickness || 1.0;
+    const F_uplift = 0.5 * pu * B_eff;
+    const M_uplift = F_uplift * ((2 * B_eff) / 3);
 
-    // Warnings
     const warnings = [];
     if (d / L < 0.2) {
-        warnings.push('Shallow water (d/L < 0.2) - Goda formula may be less accurate');
+        warnings.push('Shallow water (d/L < 0.2) — verify breaking wave criterion');
     }
-    if (H / d > 0.6) {
-        warnings.push('Breaking wave condition (H/d > 0.6) - Use breaking wave formula');
+    if (waveHeight / d > 0.6) {
+        warnings.push('Breaking wave condition (Hs/d > 0.6) — impact loads possible');
     }
     if (Math.abs(waveAngle) > 30) {
-        warnings.push('Large wave angle (>30°) - Oblique wave effects significant');
+        warnings.push('Large wave angle (>30 deg) — oblique wave effects significant');
     }
 
     return {
         forces: {
             F_h,
+            F_horizontal: F_h,
             F_uplift,
             p1,
+            p2,
             p3,
-            p4,
-            M_overturning
+            p4: pu,
+            pu,
+            M_overturning,
+            M_uplift
         },
         pressures: {
             alpha1: alpha1.toFixed(3),
@@ -367,21 +449,23 @@ function calculateVerticalWallForces(params) {
             alpha3: alpha3.toFixed(3)
         },
         waveParams: {
+            H_design: H_design.toFixed(2),
             L: L.toFixed(2),
             L0: L0.toFixed(2),
             eta_star: eta_star.toFixed(2),
+            hc_star: hc_star.toFixed(2),
             d_over_L: (d / L).toFixed(3)
         },
-        formula: 'p_1 = 0.5(1+cosβ)(α_1+α_2cosβ)ρ_w g η*, p_3 = α_3 p_1',
-        reference: 'Goda (2000) Random Seas and Design of Maritime Structures; Takahashi (2002); CEM VI-5-3',
+        formula: 'p_1 = 0.5(1+\\cos\\beta)(\\alpha_1+\\alpha_2\\cos^2\\beta)\\rho_w g H_D, \\quad p_3 = \\alpha_3 p_1, \\quad p_u = 0.5(1+\\cos\\beta)\\alpha_1\\alpha_3\\rho_w g H_D',
+        reference: 'Goda (2000) Random Seas and Design of Maritime Structures; CEM VI-5-3',
         warnings,
-        note: 'Goda formula for standing wave pressure on vertical walls'
+        note: 'Full Goda pressure integration over submerged and emerged wall faces with base uplift'
     };
 }
 
 /**
- * Check vertical wall stability (sliding and overturning)
- * @param {object} params - Wall parameters with forces
+ * Check vertical wall stability (submerged buoyancy, uplift, sliding, overturning, bearing)
+ * @param {object} params - Wall parameters with Goda forces
  * @returns {object} Stability check results
  */
 function checkVerticalWallStability(params) {
@@ -389,43 +473,84 @@ function checkVerticalWallStability(params) {
         wallHeight,
         wallThickness,
         foundationWidth,
+        depth = 0,
+        moundHeight = 0,
         concreteDensity = 2400,
         fillDensity = 1800,
         frictionCoeff = 0.6,
-        F_h, // Horizontal force from Goda
-        M_overturning // Overturning moment from Goda
+        allowableBearing = 400,
+        F_h,
+        F_uplift = 0,
+        M_overturning,
+        M_uplift = 0
     } = params;
 
     const g = 9.81;
+    const rho_w = 1025;
+    const B = Math.max(foundationWidth || wallThickness || 1.0, 0.5);
+    const t_wall = Math.min(wallThickness || B, B);
 
-    // Calculate wall weight
-    const V_concrete = wallHeight * wallThickness * 1; // per meter
-    const V_fill = wallHeight * (foundationWidth - wallThickness) * 1;
-    const W = (V_concrete * concreteDensity + V_fill * fillDensity) * g / 1000; // kN/m
+    // Dry weight per meter run
+    const V_concrete = wallHeight * t_wall;
+    const V_fill = wallHeight * Math.max(0, B - t_wall);
+    const W_dry = ((V_concrete * concreteDensity + V_fill * fillDensity) * g) / 1000; // kN/m
+
+    // Hydrostatic buoyancy on submerged volume below SWL
+    const d_wall_submerged = Math.min(wallHeight, Math.max(0, depth - moundHeight));
+    const buoyancy = (B * d_wall_submerged * rho_w * g) / 1000; // kN/m
+    const W_submerged = Math.max(0, W_dry - buoyancy);
+
+    // Effective vertical normal reaction after wave uplift
+    const N_eff = Math.max(0, W_submerged - F_uplift);
 
     // Sliding check
     const mu = frictionCoeff;
-    const FS_slide = (mu * W) / F_h;
+    const FS_slide = F_h > 0 ? (mu * N_eff) / F_h : Infinity;
 
-    // Overturning check
-    const M_resisting = W * (foundationWidth / 2);
-    const FS_overturn = M_resisting / M_overturning;
+    // Overturning check about heel (including uplift moment)
+    const M_resisting = W_submerged * (B / 2);
+    const M_total_overturn = M_overturning + M_uplift;
+    const FS_overturn = M_total_overturn > 0 ? M_resisting / M_total_overturn : Infinity;
+
+    // Eccentric toe bearing pressure
+    const M_net = M_resisting - M_total_overturn;
+    const x_res = N_eff > 0 ? M_net / N_eff : 0;
+    const eccentricity = B / 2 - x_res;
+    let q_max;
+    if (N_eff <= 0 || Math.abs(eccentricity) >= B / 2) {
+        q_max = Infinity;
+    } else if (Math.abs(eccentricity) <= B / 6) {
+        q_max = (N_eff / B) * (1 + (6 * Math.abs(eccentricity)) / B);
+    } else {
+        q_max = (2 * N_eff) / (3 * (B / 2 - Math.abs(eccentricity)));
+    }
+    const FS_bearing = Number.isFinite(q_max) && q_max > 0 ? allowableBearing / q_max : 0;
 
     return {
         sliding: {
             FS: FS_slide,
             passed: FS_slide >= 1.2,
             required: 1.2,
-            formula: 'FS_slide = (μ × W) / FH'
+            formula: 'FS_{\\text{slide}} = \\frac{\\mu (W\' - F_u)}{F_H}'
         },
         overturning: {
             FS: FS_overturn,
             passed: FS_overturn >= 1.2,
             required: 1.2,
-            formula: 'FS_overturn = (W × B/2) / M_overturning'
+            formula: 'FS_{\\text{overturn}} = \\frac{W\' \\cdot B/2}{M_H + M_u}'
         },
-        weight: W,
-        reference: 'CEM VI-5-4; Goda (2000)'
+        bearing: {
+            q_max,
+            eccentricity,
+            allowable: allowableBearing,
+            FS: FS_bearing,
+            passed: Number.isFinite(q_max) && q_max <= allowableBearing
+        },
+        weight: W_submerged,
+        weightDry: W_dry,
+        buoyancy,
+        N_eff,
+        reference: 'Goda (2000); CEM VI-5-4'
     };
 }
 
@@ -434,7 +559,7 @@ function checkVerticalWallStability(params) {
 // ==========================================
 
 /**
- * Calculate composite structure (mound + wall) performance
+ * Calculate composite structure (rubble mound base + Goda vertical crown wall)
  * @param {object} params - Composite structure parameters
  * @returns {object} Combined stability results
  */
@@ -447,47 +572,73 @@ function calculateCompositeStructure(params) {
         matDensity,
         wallHeight,
         wallThickness,
-        concreteDensity,
+        concreteDensity = 2400,
+        frictionCoeff = 0.6,
         waveHeight,
-        wavePeriod,
+        wavePeriod = 10.0,
         depth
     } = params;
 
     const rho_w = 1025;
     const Delta = (matDensity - rho_w) / rho_w;
 
-    // 1. Check mound stability (Hudson formula)
-    const KD = 2.0; // Typical for angular rock
-    const W_required = (rho_w * Math.pow(waveHeight, 3)) / (KD * Math.pow(Delta, 3) * moundSlope);
-    const W_provided = matDensity * Math.pow(armourDn50, 3);
-    const mound_stable = W_provided >= W_required;
+    // 1. Check rubble mound armour stability (Hudson formula with matDensity in numerator)
+    const KD = 2.0; // Conservative mound shoulder KD
+    const M_required = (matDensity * Math.pow(waveHeight, 3)) / (KD * Math.pow(Delta, 3) * moundSlope);
+    const M_provided = matDensity * Math.pow(armourDn50, 3);
+    const mound_stable = M_provided >= M_required;
 
-    // 2. Calculate wave forces on wall (modified for mound)
-    const d_wall = depth - moundHeight; // Effective depth at wall
-    const eta_star = 0.75 * waveHeight;
-    const p1 = 0.5 * 1.5 * rho_w * 9.81 * eta_star / 1000; // Simplified
-    const F_h = 0.5 * p1 * eta_star;
+    // 2. Modified Goda forces on vertical wall seated on mound (height above foundation = wallHeight)
+    const wallForces = calculateVerticalWallForces({
+        wallHeight,
+        foundationWidth: wallThickness,
+        wallThickness,
+        moundHeight,
+        depth,
+        waveHeight,
+        wavePeriod,
+        waveAngle: 0
+    });
 
-    // 3. Wall stability
-    const W_wall = wallHeight * wallThickness * concreteDensity * 9.81 / 1000;
-    const FS_slide = (0.6 * W_wall) / F_h;
+    // 3. Wall stability with buoyancy + uplift
+    const wallStability = checkVerticalWallStability({
+        wallHeight,
+        wallThickness,
+        foundationWidth: wallThickness,
+        depth,
+        moundHeight,
+        concreteDensity,
+        fillDensity: concreteDensity,
+        frictionCoeff,
+        F_h: wallForces.forces.F_h,
+        F_uplift: wallForces.forces.F_uplift,
+        M_overturning: wallForces.forces.M_overturning,
+        M_uplift: wallForces.forces.M_uplift
+    });
 
     return {
         mound: {
             stable: mound_stable,
-            W_required: W_required / 1000, // tonnes
-            W_provided: W_provided / 1000,
-            formula: 'W = (ρw × H³) / (KD × Δ³ × cotα)',
-            reference: 'Hudson formula; CEM VI-5-3'
+            moundWidth,
+            W_required: M_required / 1000,
+            W_provided: M_provided / 1000,
+            formula: 'M_{50} = \\frac{\\rho_s H^3}{K_D \\Delta^3 \\cot\\alpha}',
+            reference: 'Hudson Formula; CEM VI-5-3'
         },
         wall: {
-            F_h,
-            FS_slide,
-            stable: FS_slide >= 1.2,
-            formula: 'Modified Goda for composite',
-            reference: 'Takahashi (2002); CEM VI-5-4'
+            F_h: wallForces.forces.F_h,
+            F_uplift: wallForces.forces.F_uplift,
+            p1: wallForces.forces.p1,
+            p3: wallForces.forces.p3,
+            FS_slide: wallStability.sliding.FS,
+            FS_overturn: wallStability.overturning.FS,
+            q_max: wallStability.bearing.q_max,
+            weightSubmerged: wallStability.weight,
+            stable: wallStability.sliding.passed && wallStability.overturning.passed,
+            formula: 'Modified Goda (2000) with rubble berm α₂',
+            reference: 'Goda (2000); Takahashi (2002); CEM VI-5-4'
         },
-        note: 'Composite structures combine rubble mound protection with vertical wall'
+        note: 'Composite structures combine rubble mound foundation protection with a vertical superstructure wall'
     };
 }
 
@@ -496,7 +647,7 @@ function calculateCompositeStructure(params) {
 // ==========================================
 
 /**
- * Calculate caisson stability (sliding, overturning, bearing)
+ * Calculate cellular caisson stability (walls, slabs, fill, buoyancy, Goda uplift, eccentric bearing)
  * @param {object} params - Caisson parameters
  * @returns {object} Stability results
  */
@@ -505,41 +656,77 @@ function calculateCaissonStability(params) {
         caissonWidth,
         caissonHeight,
         wallThickness,
-        cellCount,
-        foundationHeight,
+        cellCount = 3,
+        foundationHeight = 2.0,
         concreteDensity = 2400,
         fillDensity = 1900,
         frictionCoeff = 0.6,
+        allowableBearing = 500,
         waveHeight,
-        wavePeriod,
+        wavePeriod = 11.0,
+        waveAngle = 0,
         depth
     } = params;
 
     const g = 9.81;
     const rho_w = 1025;
 
-    // Calculate caisson weight
-    const V_concrete = 2 * wallThickness * caissonHeight + caissonWidth * wallThickness; // Simplified
-    const V_fill = caissonWidth * caissonHeight - V_concrete;
-    const W = (V_concrete * concreteDensity + V_fill * fillDensity) * g / 1000; // kN/m
+    // Concrete volume per m length: base slab + top slab + (cellCount + 1) transverse/longitudinal walls
+    const t = wallThickness;
+    const innerH = Math.max(0, caissonHeight - 2 * t);
+    const numWalls = Math.max(2, (parseInt(cellCount, 10) || 3) + 1);
+    const totalWallThick = Math.min(caissonWidth, numWalls * t);
+    const V_concrete = caissonWidth * Math.min(caissonHeight, 2 * t) + totalWallThick * innerH;
+    const V_fill = Math.max(0, caissonWidth * caissonHeight - V_concrete);
+    const W_dry = ((V_concrete * concreteDensity + V_fill * fillDensity) * g) / 1000;
 
-    // Goda wave forces (simplified)
-    const eta_star = 0.75 * waveHeight;
-    const p1 = 0.5 * 1.5 * rho_w * g * eta_star / 1000;
-    const F_h = 0.5 * p1 * eta_star;
-    const M_overturning = F_h * (eta_star / 3);
+    // Hydrostatic buoyancy below SWL on caisson resting at (depth - foundationHeight)
+    const d_caisson = Math.max(0, depth - foundationHeight);
+    const d_sub = Math.min(caissonHeight, d_caisson);
+    const buoyancy = (caissonWidth * d_sub * rho_w * g) / 1000;
+    const W_sub = Math.max(0, W_dry - buoyancy);
 
-    // Sliding check
-    const FS_slide = (frictionCoeff * W) / F_h;
+    // Goda forces & uplift
+    const forces = calculateVerticalWallForces({
+        wallHeight: caissonHeight,
+        foundationWidth: caissonWidth,
+        wallThickness: caissonWidth,
+        moundHeight: foundationHeight,
+        depth,
+        waveHeight,
+        wavePeriod,
+        waveAngle
+    });
 
-    // Overturning check
-    const M_resisting = W * (caissonWidth / 2);
-    const FS_overturn = M_resisting / M_overturning;
+    const F_h = forces.forces.F_h;
+    const F_uplift = forces.forces.F_uplift;
+    const M_overturning = forces.forces.M_overturning;
+    const M_uplift = forces.forces.M_uplift;
 
-    // Bearing capacity (simplified)
-    const bearing_pressure = W / caissonWidth; // kPa
-    const allowable_bearing = 200; // Typical for sand foundation
-    const FS_bearing = allowable_bearing / bearing_pressure;
+    // Sliding check with buoyancy & uplift
+    const N_eff = Math.max(0, W_sub - F_uplift);
+    const FS_slide = F_h > 0 ? (frictionCoeff * N_eff) / F_h : Infinity;
+
+    // Overturning check about heel
+    const M_resisting = W_sub * (caissonWidth / 2);
+    const M_total_overturn = M_overturning + M_uplift;
+    const FS_overturn = M_total_overturn > 0 ? M_resisting / M_total_overturn : Infinity;
+
+    // Eccentric trapezoidal / triangular toe bearing pressure
+    const M_net = M_resisting - M_total_overturn;
+    const x_res = N_eff > 0 ? M_net / N_eff : 0;
+    const eccentricity = caissonWidth / 2 - x_res;
+    let bearing_pressure;
+    if (N_eff <= 0 || Math.abs(eccentricity) >= caissonWidth / 2) {
+        bearing_pressure = Infinity;
+    } else if (Math.abs(eccentricity) <= caissonWidth / 6) {
+        bearing_pressure = (N_eff / caissonWidth) * (1 + (6 * Math.abs(eccentricity)) / caissonWidth);
+    } else {
+        bearing_pressure = (2 * N_eff) / (3 * (caissonWidth / 2 - Math.abs(eccentricity)));
+    }
+    const FS_bearing = Number.isFinite(bearing_pressure) && bearing_pressure > 0
+        ? allowableBearing / bearing_pressure
+        : 0;
 
     return {
         sliding: {
@@ -554,12 +741,18 @@ function calculateCaissonStability(params) {
         },
         bearing: {
             pressure: bearing_pressure,
+            eccentricity,
+            allowable: allowableBearing,
             FS: FS_bearing,
-            passed: FS_bearing >= 2.0,
-            required: 2.0
+            passed: Number.isFinite(bearing_pressure) && FS_bearing >= 1.5,
+            required: 1.5
         },
-        weight: W,
-        formula: 'Goda forces + stability checks',
+        forces: forces.forces,
+        weight: W_sub,
+        weightDry: W_dry,
+        buoyancy,
+        N_eff,
+        formula: 'Goda (2000) forces + buoyancy + uplift + eccentric bearing',
         reference: 'Goda (2000); CEM VI-5-4'
     };
 }

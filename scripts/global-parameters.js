@@ -160,20 +160,217 @@ class GlobalParameterManager {
     resetModuleOverrides(moduleId) {
         if (this.overrides.has(moduleId)) {
             this.overrides.delete(moduleId);
-            // Notify general change? Or specific?
-            // For now, simpler notification mechanism usually sufficient
             this.notifyListeners(null, 'reset-module', null, moduleId);
         }
+    }
+
+    /**
+     * Resolve parameter key from optional category + name arguments.
+     */
+    _resolveKey(paramCategoryOrKey, paramName) {
+        if (paramName === undefined || paramName === null || paramName === '') {
+            return paramCategoryOrKey;
+        }
+        if (this.definitions.has(paramName) || this.globals.has(paramName)) {
+            return paramName;
+        }
+        const namespaced = `${paramCategoryOrKey}.${paramName}`;
+        if (this.definitions.has(namespaced) || this.globals.has(namespaced)) {
+            return namespaced;
+        }
+        return paramName;
+    }
+
+    /**
+     * Retrieve parameter details compatible with EnhancedFormBuilder.
+     */
+    getParameter(paramCategoryOrKey, paramName = undefined, moduleId = null) {
+        const key = paramName !== undefined
+            ? this._resolveKey(paramCategoryOrKey, paramName)
+            : paramCategoryOrKey;
+        const state = this.getParameterState(moduleId, key);
+        const def = this.definitions.get(key) || {};
+        return {
+            ...state,
+            unit: def.defaultUnit || '',
+            label: def.label || key,
+            defaultValue: state.value ?? def.defaultValue ?? null
+        };
+    }
+
+    /**
+     * Set a global parameter supporting both (key, value, [source]) and (category, name, value, [source]).
+     */
+    setGlobalParameter(paramCategoryOrKey, paramNameOrValue, maybeValue = undefined, source = 'user') {
+        if (maybeValue === undefined) {
+            this.setGlobal(paramCategoryOrKey, paramNameOrValue, source);
+            return;
+        }
+        if (typeof paramNameOrValue === 'string') {
+            const resolved = this._resolveKey(paramCategoryOrKey, paramNameOrValue);
+            if (this.definitions.has(resolved) || !this.definitions.has(paramCategoryOrKey)) {
+                this.setGlobal(resolved, maybeValue, source);
+                return;
+            }
+        }
+        this.setGlobal(paramCategoryOrKey, paramNameOrValue, maybeValue);
+    }
+
+    /**
+     * Set a local module override supporting (moduleId, key, val) and (moduleId, cat, name, val).
+     */
+    setLocalOverride(moduleId, paramCategoryOrKey, paramNameOrValue, maybeValue = undefined) {
+        if (maybeValue !== undefined) {
+            const key = this._resolveKey(paramCategoryOrKey, paramNameOrValue);
+            this.setOverride(moduleId, key, maybeValue);
+        } else {
+            this.setOverride(moduleId, paramCategoryOrKey, paramNameOrValue);
+        }
+    }
+
+    /**
+     * Clear a local module override supporting (moduleId, cat, name) and (moduleId, key).
+     */
+    clearLocalOverride(moduleId, paramCategoryOrKey, paramName = undefined) {
+        const key = paramName !== undefined
+            ? this._resolveKey(paramCategoryOrKey, paramName)
+            : paramCategoryOrKey;
+        this.clearOverride(moduleId, key);
+    }
+
+    /**
+     * Return true if moduleId currently overrides the given parameter.
+     */
+    hasOverride(moduleId, paramCategoryOrKey, paramName = undefined) {
+        const key = paramName !== undefined
+            ? this._resolveKey(paramCategoryOrKey, paramName)
+            : paramCategoryOrKey;
+        return Boolean(moduleId && this.overrides.has(moduleId) && this.overrides.get(moduleId).has(key));
+    }
+
+    /**
+     * Export globals and module overrides as a plain JSON-serializable object.
+     */
+    exportParameters() {
+        const globals = {};
+        for (const [key, entry] of this.globals.entries()) {
+            globals[key] = { ...entry };
+        }
+        const overrides = {};
+        for (const [moduleId, moduleMap] of this.overrides.entries()) {
+            overrides[moduleId] = Object.fromEntries(moduleMap.entries());
+        }
+        return {
+            version: 1,
+            globals,
+            overrides
+        };
+    }
+
+    /**
+     * Import globals and module overrides from exported data.
+     */
+    importParameters(data) {
+        this.globals.clear();
+        this.overrides.clear();
+        if (!data || typeof data !== 'object') {
+            this.notifyListeners(null, 'import', null, null);
+            return;
+        }
+
+        if (data.globals && typeof data.globals === 'object') {
+            for (const [key, entry] of Object.entries(data.globals)) {
+                const value = entry && typeof entry === 'object' && 'value' in entry ? entry.value : entry;
+                const source = entry && typeof entry === 'object' && entry.source ? entry.source : 'import';
+                this.globals.set(key, {
+                    value,
+                    source,
+                    timestamp: (entry && entry.timestamp) || Date.now()
+                });
+            }
+        } else {
+            // Legacy flat or category-nested map fallback
+            for (const [key, val] of Object.entries(data)) {
+                if (key === 'version' || key === 'overrides') continue;
+                if (val && typeof val === 'object' && !('value' in val)) {
+                    for (const [subKey, subVal] of Object.entries(val)) {
+                        this.globals.set(this._resolveKey(key, subKey), {
+                            value: subVal,
+                            source: 'import',
+                            timestamp: Date.now()
+                        });
+                    }
+                } else {
+                    const value = val && typeof val === 'object' && 'value' in val ? val.value : val;
+                    this.globals.set(key, {
+                        value,
+                        source: 'import',
+                        timestamp: Date.now()
+                    });
+                }
+            }
+        }
+
+        if (data.overrides && typeof data.overrides === 'object') {
+            for (const [moduleId, moduleEntries] of Object.entries(data.overrides)) {
+                if (moduleEntries && typeof moduleEntries === 'object') {
+                    const map = new Map(Object.entries(moduleEntries));
+                    this.overrides.set(moduleId, map);
+                }
+            }
+        }
+
+        this.notifyListeners(null, 'import', null, null);
+    }
+
+    /**
+     * Create a badge element indicating a local override is active.
+     */
+    createOverrideIndicator(paramCategory, paramName, moduleId) {
+        if (typeof document === 'undefined') return null;
+        if (!this.hasOverride(moduleId, paramCategory, paramName)) return null;
+
+        const key = this._resolveKey(paramCategory, paramName);
+        const globalVal = this.globals.get(key)?.value;
+
+        const badge = document.createElement('span');
+        badge.className = 'parameter-override-badge';
+        badge.textContent = 'Override';
+        badge.title = globalVal !== undefined
+            ? `Locally overridden (global: ${globalVal})`
+            : 'Locally overridden';
+        return badge;
+    }
+
+    /**
+     * Create a button to clear a local override and revert to the global value.
+     */
+    createResetButton(paramCategory, paramName, moduleId, onReset = null) {
+        if (typeof document === 'undefined') return null;
+
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'parameter-reset-btn btn-secondary';
+        btn.textContent = '↺ Reset';
+        btn.title = 'Revert to global parameter value';
+        btn.addEventListener('click', () => {
+            this.clearLocalOverride(moduleId, paramCategory, paramName);
+            if (typeof onReset === 'function') {
+                onReset();
+            }
+        });
+        return btn;
     }
 }
 
 // Export singleton
-window.GlobalParams = new GlobalParameterManager();
+const globalParamsInstance = new GlobalParameterManager();
 
 // Initialize standard definitions
 const definitions = [
     // Environmental
     { key: 'waterDepth', label: 'Water Depth', defaultUnit: 'm', type: 'number' },
+    { key: 'offshoreDepth', label: 'Offshore Water Depth', defaultUnit: 'm', type: 'number' },
     { key: 'deepWaterDepth', label: 'Deep Water Depth', defaultUnit: 'm', type: 'number' },
     { key: 'toeDepth', label: 'Toe Depth', defaultUnit: 'm', type: 'number' },
     { key: 'waveHeight', label: 'Wave Height (Hs)', defaultUnit: 'm', type: 'number' },
@@ -188,7 +385,18 @@ const definitions = [
 
     // Structure
     { key: 'slopeAngle', label: 'Structure Slope', defaultUnit: 'deg', type: 'number' },
-    { key: 'armourDensity', label: 'Armour Density', defaultUnit: 'kg/m³', type: 'number' }
+    { key: 'armourDensity', label: 'Armour Density', defaultUnit: 'kg/m³', type: 'number' },
+    { key: 'freeboard', label: 'Crest Freeboard', defaultUnit: 'm', type: 'number' },
+    { key: 'crestWidth', label: 'Crest Width', defaultUnit: 'm', type: 'number' }
 ];
 
-definitions.forEach(def => window.GlobalParams.defineParameter(def.key, def));
+definitions.forEach(def => globalParamsInstance.defineParameter(def.key, def));
+
+if (typeof window !== 'undefined') {
+    window.GlobalParams = globalParamsInstance;
+    window.globalParamManager = globalParamsInstance;
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { GlobalParameterManager, GlobalParams: globalParamsInstance };
+}

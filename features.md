@@ -158,7 +158,7 @@ Transition layer between primary armour and filter layer.
 #### 4. **Filter Layer / Underlayer 2**
 Critical layer preventing core material migration while maintaining drainage.
 
-**Purpose:**
+**Purpose:**  
 - Prevent fine core material from washing out through armour voids
 - Maintain permeability for internal drainage
 - Distribute loads from upper layers

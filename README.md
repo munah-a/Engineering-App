@@ -1,190 +1,112 @@
 # CoastalEngineer Pro
 
-A comprehensive coastal engineering web application for advanced breakwater design, wave analysis, and structural calculations.
+A comprehensive coastal engineering web application for coastal structure design, offshore-to-toe wave transformation, stability analysis, EurOtop (2018) overtopping serviceability, multi-structure project workflows, and report generation.
 
 ## Features
 
 ### Core Coastal Engineering Features
 
-#### 🌊 Wave Predictor
-- Fetch-limited wave growth using SMB and JONSWAP methods
-- Depth-limited breaking wave height calculator (Miche & Goda criteria)
-- Design Water Level (DWL) tool with Tides, Wave Set-up, and Sea Level Rise
+#### Wave Predictor & Offshore-to-Toe Transformation
+- Fetch-limited wave growth using **SMB** (USACE SPM/CEM) and **JONSWAP** methods
+- **Fenton–McKee / Newton–Raphson** wave dispersion solver for deep, transitional, and shallow water
+- Offshore-to-toe wave transformation including shoaling ($K_s$), Snell's law refraction ($K_r$), and **Goda (2010)** depth-limited wave breaking ($H_b$)
+- Design Water Level (**DWL**) calculator combining Tide Stations / High Tide Level, Sea Level Rise (SLR), and breaking wave setup ($\eta$)
 
-#### 🏔️ Armour Stability Suite (Rubble Mound Structures)
-- Hudson formula for preliminary sizing
-- Van der Meer formulae for detailed stability analysis
-- Material database with customizable densities
-- Multiple structure types: Standard, Berm, Reef, Low-Crested
+#### Structure Stability Suite (11 Templates)
+- **Rubble Mound Structures:**
+  - `rubble-standard` — Standard multi-layer breakwater (Hudson 1959 & Van der Meer 1988)
+  - `rubble-bullnose` — Rubble mound with concrete crown wall / recurved bullnose wave return
+  - `rubble-berm` — Reshaping / statically stable berm breakwater ($H_0$, $H_0 T_0$, recession)
+  - `rubble-reef` — Submerged / emergent low-profile reef breakwater with wave transmission ($K_t$, $H_t$)
+  - `rubble-low` — Low-crested breakwater with Van der Meer reduction, transmission, and overtopping
+  - `rubble-revetment` — Shoreline armour revetment protecting reclamation fill with runup ($R_{u2\%}$) and overtopping
+- **Vertical & Composite Structures:**
+  - `vertical-wall` — Vertical gravity wall using **Goda (2010)** wave pressure, sliding, overturning, and bearing checks
+  - `vertical-composite` — Rubble mound foundation + vertical superstructure wall
+  - `vertical-caisson` — Multi-cell sand-ballasted caisson breakwater stability
+  - `vertical-perforated` — Wave-dissipating perforated front-wall caisson ($K_r$ reflection & force reduction)
+- **Custom Structure (`custom`):**
+  - Configurable rubble-mound or vertical-gravity family analysis
 
-#### 🏢 Vertical Structures
-- Goda formula for wave pressure calculation
-- Sliding and overturning stability analysis
-- Foundation bearing capacity verification
-- Caisson design and optimization
-- Multiple types: Vertical Wall, Composite, Caisson, Perforated
+#### Serviceability & Overtopping Analysis (EurOtop 2018)
+- **EurOtop 2nd Edition (2018)** Eqs. 5.10 & 5.11 mean wave overtopping discharge ($q$) for breaking and non-breaking regimes
+- Handles zero and negative crest freeboards ($R_c \le 0$) including submerged crest weir overflow
+- Surface roughness selector ($\gamma_f$), crest width reduction factor ($C_r$), wall/bullnose factor ($\gamma_v$), and $2\%$ runup ($R_{u2\%}$)
+- Individual maximum wave overtopping volume ($V_{\max}$) and threshold checks for pedestrians, vehicles, and buildings
 
-#### 📐 Cross-Section Designer
-- Graphical and input-driven interface
-- Template library with pre-configured cross-sections
-- Real-time visualization
-- Interactive slope and crest configuration
-- Automated filter and underlayer sizing
-- Structure-specific calculation engine
-
-#### ⚠️ Serviceability Analysis
-- EurOtop-based mean overtopping discharge calculations
-- Individual wave volume hazard assessment
-- Safety threshold indicators for pedestrians, vehicles, and buildings
-
-### Application Features
-
-#### 🔄 Unit Conversion
-- Multi-unit support for all engineering parameters
-- Real-time conversion between Metric and Imperial systems
-- Customizable unit preferences
-
-#### 📄 Engineering Report PDF Export
-- Professional report generation with customizable templates
-- Formula rendering in correct mathematical notation using LaTeX
-- Auto-generated content including:
-  - Project metadata and site information
-  - Input parameters with units
-  - Calculation steps with formulas
-  - Results summary with visualizations
-  - Design diagrams and cross-sections
+### Application Platform Features
+- **Interactive Cross-Section Canvas:** Live scaled rendering across all 11 templates, wheel zoom (`0.4x` to `3.0x`), click-and-drag pan, and reset view
+- **Bidirectional Metric / Imperial Unit Conversion:** Live UI value and label conversion (`m`/`ft`, `m/s`/`mph`, `kg/m³`/`lb/ft³`, `l/s/m`/`cfs/ft`, preserving unitless slopes and angles in degrees `°`) while storing canonical SI values internally
+- **Global & Per-Module Parameters:** Synchronized shared hydraulic/environment parameters with local override tracking and reset controls
+- **Multi-Structure Project Wizard & IndexedDB Storage:** Step-by-step project setup (`#startProjectWizardBtn`), persistent projects (`projectsGrid`), and Structure Library (`#saveLibraryModal`, save/search/load/edit/delete)
+- **Engineering Report Export:** Non-blocking HTML/PDF preview iframe with KaTeX formula rendering, printable view toolbar, wave transformation tables, all 11 structure summaries, and EurOtop (2018) equations
 
 ## Getting Started
 
 ### Quick Start
 
-1. **Open the application**:
-   - Simply open `index.html` in a modern web browser
-   - Or use a local server (recommended):
-     ```bash
-     # Using Python 3
-     python -m http.server 8000
-     
-     # Using Node.js http-server
-     npx http-server
-     ```
-   - Then navigate to `http://localhost:8000`
+1. Serve the workspace using any local static HTTP server (recommended so ES/IndexedDB & print windows behave consistently):
+   ```bash
+   # Python 3
+   python -m http.server 8000
 
-2. **No installation required** - this is a standalone web application
+   # Or Node.js
+   npx http-server -p 8000
+   ```
+   Or on Windows, launch `start-server.bat`.
+2. Open `http://localhost:8000` in Chrome, Edge, Firefox, or Safari.
+3. Optional internet access loads Google Fonts & KaTeX from CDN for equation typesetting; all core calculations and visualizations run locally with zero build step.
 
-### Browser Requirements
+### Publishing (GitHub Pages)
 
-- Modern browser with JavaScript enabled
-- Chrome, Firefox, Edge, or Safari (latest versions recommended)
-- Internet connection for loading fonts and KaTeX (for formula rendering)
+The workflow in `.github/workflows/deploy-pages.yml` automatically runs the `node --test` engineering and UI integration suites on pushes to `main` (or manual **Run workflow** dispatch in GitHub Actions) and publishes only the runtime static web bundle (`index.html`, `styles.css`, `scripts/`, and `.nojekyll`) to GitHub Pages.
 
-## Usage Guide
+## Running Automated Tests
 
-### Dashboard
-Start at the dashboard to access all features quickly. Each feature card provides direct navigation to the respective tool.
+Unit and integration test suites use the built-in Node.js test runner (`node:test`, Node 18+):
 
-### Wave Analysis
-1. Navigate to "Wave Analysis"
-2. Enter wind speed, fetch length, and water depth
-3. Select calculation method (SMB or JONSWAP)
-4. Enter Design Water Level parameters
-5. Click "Calculate Wave Parameters"
-6. Review results and applied formulas
-
-### Structure Design
-1. Navigate to "Structure Design"
-2. Select a template from the sidebar:
-   - Rubble Mound: Standard, Berm, Reef, Low-Crested
-   - Vertical: Wall, Composite, Caisson, Perforated
-3. View the real-time canvas visualization
-4. Adjust parameters in the design panel
-5. Click "Analyze Structure" for stability calculations
-
-### Serviceability Analysis
-1. Navigate to "Serviceability"
-2. Enter structure geometry (freeboard, slope, crest width)
-3. Enter wave conditions
-4. Click "Calculate Overtopping"
-5. Review overtopping discharge and safety assessments
-
-### PDF Report Generation
-1. Navigate to "Reports"
-2. Fill in project information
-3. Select sections to include
-4. Click "Generate PDF Report"
-5. A print dialog will open for PDF export
-
-## Technology Stack
-
-- **HTML5** - Modern semantic markup
-- **CSS3** - Custom design system with gradients and animations
-- **Vanilla JavaScript** - No framework dependencies
-- **KaTeX** - Mathematical formula rendering
-- **Canvas API** - Real-time structure visualization
-
-## Formulas & Methodologies
-
-### Wave Analysis
-- **SMB** (Shore Protection Manual)
-- **JONSWAP** spectrum
-- **Miche criterion** for breaking waves
-- **Goda criterion** for depth-limited waves
-
-### Stability Analysis
-- **Hudson formula** - Preliminary armour sizing
-- **Van der Meer** - Detailed stability (plunging & surging)
-- **Goda formula** - Vertical wall wave pressure
-
-### Serviceability
-- **EurOtop guidelines** - Overtopping calculations
-- Safety thresholds per European standards
-
-## Material Database
-
-Pre-loaded materials with densities:
-- Granite: 2650 kg/m³
-- Limestone: 2500 kg/m³
-- Coral Rock: 2100 kg/m³
-- Concrete: 2400 kg/m³
-- Basalt: 2900 kg/m³
-- Quarry Run: 2700 kg/m³
-
-## File Structure
-
+```bash
+node --test
 ```
+
+Individual suites:
+```bash
+node --test tests/engineering-calculations.test.js tests/app-integration.test.js
+```
+
+## Directory Structure
+
+```text
 Engineering App/
-│
-├── index.html              # Main application file
-├── styles.css              # Complete styling system
-├── features.md             # Feature documentation
-├── README.md               # This file
-│
-└── scripts/
-    ├── main.js             # Core application logic
-    ├── calculations.js     # Engineering formulas
-    ├── canvas.js           # Structure visualization
-    └── pdf-export.js       # Report generation
+├── .github/workflows/deploy-pages.yml # Automated test & GitHub Pages deployment
+├── index.html                  # Single-page application views & modals
+├── styles.css                  # Material Design 3 light/dark styles & tokens
+├── features.md                 # Feature specifications
+├── README.md                   # Application overview & documentation
+├── start-server.bat            # Windows local HTTP server launcher
+├── scripts/
+│   ├── main.js                 # AppState, routing, UnitConverter, template controls
+│   ├── calculations.js         # Dispersion, SMB/JONSWAP, Hudson/VdM, EurOtop 2018
+│   ├── wave-transformation.js  # Shoaling, refraction, Goda/Miche breaking
+│   ├── structure-calculations.js # Goda walls, caissons, berm, reef, low-crested, bullnose
+│   ├── structure-analysis.js   # UI orchestration for specialized & custom structures
+│   ├── canvas.js               # Interactive zoom/pan Canvas visualizer (11 templates)
+│   ├── global-parameters.js    # Shared GlobalParams & local override management
+│   ├── enhanced-forms.js       # Override-aware form input helpers
+│   ├── project-manager.js      # IndexedDB project persistence
+│   ├── project-ui.js           # Dashboard project cards & search
+│   ├── project-wizard.js       # 5-step multi-structure Project Wizard
+│   ├── structure-library.js    # IndexedDB Structure Library model & notifications
+│   ├── library-ui.js           # Structure Library cards & Designer save/load modal
+│   ├── tooltip-system.js       # Engineering parameter tooltips
+│   └── pdf-export.js           # HTML/KaTeX report generator & print preview
+├── tests/
+│   ├── engineering-calculations.test.js # Physics & formula unit tests
+│   └── app-integration.test.js          # DOM/UI, units, globals, escaping & report tests
+├── docs/                       # Historical development notes & implementation guides
+└── references/                 # Engineering reference PDFs & extracted texts
 ```
 
-## Design Philosophy
+## Engineering Notice
 
-This application prioritizes:
-1. **Professional aesthetics** - Premium dark theme with ocean-inspired colors
-2. **Ease of use** - Intuitive navigation and clear workflows
-3. **Engineering accuracy** - Industry-standard formulas and methods
-4. **Visual feedback** - Real-time canvas updates and formula rendering
-5. **Comprehensive reporting** - Professional PDF output
-
-## Safety Notice
-
-⚠️ **Important**: This software is provided for engineering analysis purposes. All calculations should be verified by a qualified coastal engineer before use in actual construction projects. The developers assume no liability for designs created using this tool.
-
-## Credits
-
-**CoastalEngineer Pro** - Advanced Coastal Structure Design Platform
-
-Developed with modern web technologies and coastal engineering best practices.
-
----
-
-*For support or questions, refer to the documentation within the application.*
+**Important:** This software is provided for coastal engineering analysis and design support. All calculated dimensions, forces, stability factors, and overtopping rates must be independently reviewed and verified by a qualified coastal engineer prior to construction use.

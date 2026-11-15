@@ -17,13 +17,118 @@ const AppState = {
 };
 
 // ==========================================
+// SECURITY & DESIGN INPUT HELPERS
+// ==========================================
+function escapeHtml(text) {
+    if (text === null || text === undefined) return '';
+    return String(text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function getDesignInput(key) {
+    if (typeof document === 'undefined' || !key) return null;
+    return (
+        document.getElementById(`design_${key}`) ||
+        document.querySelector(`#parameterInputs [data-param-id="${key}"]`)
+    );
+}
+
+function getDesignValue(key, fallback = 0) {
+    const el = getDesignInput(key);
+    if (!el) return fallback;
+
+    if (el.type === 'checkbox') {
+        return Boolean(el.checked);
+    }
+
+    if (el.tagName === 'SELECT') {
+        const raw = el.value;
+        if (el.dataset.valueType === 'string') return raw;
+        if (raw !== '' && !Number.isNaN(Number(raw)) && Number.isFinite(Number(raw))) {
+            return Number(raw);
+        }
+        return raw;
+    }
+
+    if (el.dataset.siValue !== undefined && el.dataset.siValue !== '') {
+        const cached = parseFloat(el.dataset.siValue);
+        if (Number.isFinite(cached)) return cached;
+    }
+
+    const raw = parseFloat(el.value);
+    if (!Number.isFinite(raw)) return fallback;
+
+    const unitType = el.dataset.unitType || 'dimensionless';
+    return UnitConverter.toSI(raw, unitType, AppState.unitSystem);
+}
+
+function readSIInput(id, fallback = 0) {
+    if (typeof document === 'undefined' || !id) return fallback;
+    const el = document.getElementById(id);
+    if (!el) return fallback;
+
+    if (el.dataset.siValue !== undefined && el.dataset.siValue !== '') {
+        const cached = parseFloat(el.dataset.siValue);
+        if (Number.isFinite(cached)) return cached;
+    }
+
+    const raw = parseFloat(el.value);
+    if (!Number.isFinite(raw)) return fallback;
+
+    const unitType = el.dataset.unitType || 'dimensionless';
+    return UnitConverter.toSI(raw, unitType, AppState.unitSystem);
+}
+
+function _mapUnitToType(unit) {
+    switch (unit) {
+        case 'm': return 'length';
+        case 'cm': return 'length_cm';
+        case 'm/s': return 'speed';
+        case 'kg/m³': return 'density';
+        case 'l/s/m': return 'discharge';
+        case '°': return 'angle';
+        case 's': return 'time';
+        case '%': return 'percent';
+        default: return 'dimensionless';
+    }
+}
+
+function _formatConvertedNumber(val) {
+    if (!Number.isFinite(val)) return '';
+    const abs = Math.abs(val);
+    if (abs === 0) return '0';
+    if (abs < 0.1) return String(parseFloat(val.toFixed(4)));
+    if (abs < 1) return String(parseFloat(val.toFixed(3)));
+    return String(parseFloat(val.toFixed(2)));
+}
+
+// ==========================================
 // PAGE NAVIGATION
 // ==========================================
+const PageRouteAliases = {
+    'designer-rubble': { page: 'designer', template: 'rubble-standard' },
+    'designer-vertical': { page: 'designer', template: 'vertical-wall' }
+};
+
 function navigateToPage(pageName) {
+    if (typeof document === 'undefined') return false;
+
+    const alias = PageRouteAliases[pageName];
+    const resolvedPage = alias ? alias.page : pageName;
+    const targetPage = document.getElementById(resolvedPage);
+    if (!targetPage) {
+        console.warn(`navigateToPage: Unknown page '${pageName}'`);
+        return false;
+    }
+
     // Update navigation links
     document.querySelectorAll('.nav-link').forEach(link => {
         link.classList.remove('active');
-        if (link.dataset.page === pageName) {
+        if (link.dataset.page === resolvedPage) {
             link.classList.add('active');
         }
     });
@@ -33,55 +138,119 @@ function navigateToPage(pageName) {
         page.classList.remove('active');
     });
 
-    const targetPage = document.getElementById(pageName);
-    if (targetPage) {
-        targetPage.classList.add('active');
-        AppState.currentPage = pageName;
+    targetPage.classList.add('active');
+    AppState.currentPage = resolvedPage;
 
-        // Initialize canvas when designer page is shown
-        if (pageName === 'designer') {
-            setTimeout(() => {
-                if (typeof initCanvas === 'function') {
-                    initCanvas();
-                }
-                if (typeof drawStructureOnCanvas === 'function') {
-                    drawStructureOnCanvas(AppState.selectedTemplate);
-                }
-            }, 100);
+    if (resolvedPage === 'designer') {
+        const parameterPanel = document.querySelector('.design-parameters');
+        if (parameterPanel) {
+            parameterPanel.style.display = 'block';
         }
+
+        const templateToLoad = alias ? alias.template : null;
+        if (templateToLoad) {
+            AppState.selectedTemplate = templateToLoad;
+            loadTemplate(templateToLoad);
+        } else {
+            const parameterInputs = document.getElementById('parameterInputs');
+            if (parameterInputs && parameterInputs.children.length === 0) {
+                loadTemplate(AppState.selectedTemplate || 'rubble-standard');
+            } else {
+                const templateSelect = document.getElementById('structureTemplateSelect');
+                if (templateSelect && AppState.selectedTemplate) {
+                    templateSelect.value = AppState.selectedTemplate;
+                }
+            }
+        }
+
+        setTimeout(() => {
+            if (typeof initCanvas === 'function') {
+                initCanvas();
+            }
+            if (typeof drawStructureOnCanvas === 'function') {
+                drawStructureOnCanvas(AppState.selectedTemplate);
+            }
+        }, 50);
     }
+
+    return true;
 }
 
 // ==========================================
 // UNIT CONVERSION
 // ==========================================
 const UnitConverter = {
-    length: {
-        metric: { m: 1, cm: 100, mm: 1000 },
-        imperial: { ft: 3.28084, in: 39.3701, yd: 1.09361 }
+    definitions: {
+        length: { metricLabel: 'm', imperialLabel: 'ft', toImperialFactor: 3.280839895 },
+        length_cm: { metricLabel: 'cm', imperialLabel: 'in', toImperialFactor: 0.3937007874 },
+        speed: { metricLabel: 'm/s', imperialLabel: 'mph', toImperialFactor: 2.2369362921 },
+        density: { metricLabel: 'kg/m³', imperialLabel: 'lb/ft³', toImperialFactor: 0.0624279606 },
+        discharge: { metricLabel: 'l/s/m', imperialLabel: 'ft³/s/ft', toImperialFactor: 0.0107639104 },
+        volume_per_m: { metricLabel: 'm³/m', imperialLabel: 'ft³/ft', toImperialFactor: 10.7639104 },
+        angle: { metricLabel: '°', imperialLabel: '°', toImperialFactor: 1 },
+        time: { metricLabel: 's', imperialLabel: 's', toImperialFactor: 1 },
+        percent: { metricLabel: '%', imperialLabel: '%', toImperialFactor: 1 },
+        dimensionless: { metricLabel: '', imperialLabel: '', toImperialFactor: 1 }
     },
-    density: {
-        metric: { 'kg/m³': 1 },
-        imperial: { 'lb/ft³': 0.062428 }
+
+    toSI(value, unitType = 'dimensionless', system = AppState.unitSystem) {
+        if (!Number.isFinite(value)) return NaN;
+        if (system !== 'imperial') return value;
+        const def = this.definitions[unitType];
+        if (!def || def.toImperialFactor === 1) return value;
+        return value / def.toImperialFactor;
     },
-    discharge: {
-        metric: { 'l/s/m': 1, 'm³/s/m': 0.001 },
-        imperial: { 'gal/s/ft': 0.198 }
+
+    fromSI(value, unitType = 'dimensionless', system = AppState.unitSystem) {
+        if (!Number.isFinite(value)) return NaN;
+        if (system !== 'imperial') return value;
+        const def = this.definitions[unitType];
+        if (!def || def.toImperialFactor === 1) return value;
+        return value * def.toImperialFactor;
+    },
+
+    getUnitLabel(unitType = 'dimensionless', system = AppState.unitSystem) {
+        const def = this.definitions[unitType];
+        if (!def) return '';
+        return system === 'imperial' ? def.imperialLabel : def.metricLabel;
+    },
+
+    convertAllInputs(fromSystem, toSystem) {
+        if (typeof document === 'undefined' || fromSystem === toSystem) return;
+        document.querySelectorAll('input[type="number"][data-unit-type]').forEach(input => {
+            const unitType = input.dataset.unitType || 'dimensionless';
+            const def = this.definitions[unitType];
+            if (!def || def.toImperialFactor === 1) return;
+
+            let siVal;
+            if (input.dataset.siValue !== undefined && input.dataset.siValue !== '') {
+                siVal = parseFloat(input.dataset.siValue);
+            } else {
+                const raw = parseFloat(input.value);
+                if (!Number.isFinite(raw)) return;
+                siVal = this.toSI(raw, unitType, fromSystem);
+            }
+
+            if (!Number.isFinite(siVal)) return;
+            input.dataset.siValue = String(siVal);
+
+            if (toSystem === 'metric') {
+                input.value = String(parseFloat(siVal.toFixed(6)));
+            } else {
+                input.value = _formatConvertedNumber(this.fromSI(siVal, unitType, toSystem));
+            }
+        });
     }
 };
 
-function convertUnit(value, fromSystem, toSystem, type) {
-    if (fromSystem === toSystem) return value;
-
-    // Convert to base metric unit
-    const baseValue = value;
-
-    // Convert from base to target
-    // Simple implementation - extend as needed
-    return baseValue;
+function convertUnit(value, fromSystem, toSystem, type = 'length') {
+    if (!Number.isFinite(value) || fromSystem === toSystem) return value;
+    const siVal = UnitConverter.toSI(value, type, fromSystem);
+    return UnitConverter.fromSI(siVal, type, toSystem);
 }
 
 function updateUnitsDisplay() {
+    if (typeof document === 'undefined') return;
     const system = AppState.unitSystem;
     const unitIndicator = document.querySelector('.unit-indicator');
 
@@ -89,34 +258,9 @@ function updateUnitsDisplay() {
         unitIndicator.textContent = system === 'metric' ? 'Metric' : 'Imperial';
     }
 
-    // Update all unit displays
-    document.querySelectorAll('.unit').forEach(el => {
-        const type = el.dataset.unitType || 'length';
-        if (system === 'imperial') {
-            switch (type) {
-                case 'length':
-                    el.textContent = 'ft';
-                    break;
-                case 'density':
-                    el.textContent = 'lb/ft³';
-                    break;
-                case 'discharge':
-                    el.textContent = 'gal/s/ft';
-                    break;
-            }
-        } else {
-            switch (type) {
-                case 'length':
-                    el.textContent = 'm';
-                    break;
-                case 'density':
-                    el.textContent = 'kg/m³';
-                    break;
-                case 'discharge':
-                    el.textContent = 'l/s/m';
-                    break;
-            }
-        }
+    document.querySelectorAll('.unit[data-unit-type]').forEach(el => {
+        const type = el.dataset.unitType || 'dimensionless';
+        el.textContent = UnitConverter.getUnitLabel(type, system);
     });
 }
 
@@ -144,96 +288,120 @@ const ParameterBindings = [
     // Wave Analysis Page
     { id: 'windSpeed', key: 'windSpeed' },
     { id: 'fetchLength', key: 'fetchLength' },
-    { id: 'waterDepth', key: 'deepWaterDepth' }, // Deep water depth for wave generation
+    { id: 'offshoreDepth', key: 'offshoreDepth' },
+    { id: 'toeDepthWave', key: 'toeDepth' },
     { id: 'msl', key: 'msl' },
     { id: 'tidalRange', key: 'tidalRange' },
     { id: 'slr', key: 'slr' },
 
-    // Serviceability & Structure Page
+    // Serviceability Page
+    { id: 'freeboard', key: 'freeboard' },
+    { id: 'slopeAngle', key: 'slopeAngle' },
+    { id: 'crestWidth', key: 'crestWidth' },
     { id: 'waveHeight', key: 'waveHeight' },
     { id: 'wavePeriod', key: 'wavePeriod' },
-    { id: 'toeDepth', key: 'toeDepth' }    // Toe depth for structure design
+    { id: 'toeDepth', key: 'toeDepth' }
 ];
 
 
 function initializeParameterBindings() {
-    if (!window.GlobalParams) return;
+    if (!window.GlobalParams || typeof document === 'undefined') return;
 
-    // 1. Initialize globals with default values if not set
-    const defaults = {
-        deepWaterDepth: 30.0,
-        toeDepth: 2.0,
-        windSpeed: 20,
-        fetchLength: 20000,
-        msl: 0.0,
-        tidalRange: 0.7,
-        slr: 0.5,
-        waveHeight: 1.0,
-        wavePeriod: 10.0
-    };
-
-    Object.entries(defaults).forEach(([key, value]) => {
-        // Only set if not already set (reloads)
-        // For now, simple set
-        window.GlobalParams.setGlobal(key, value, 'init');
-    });
-
-    // 2. Bind static inputs
-    ParameterBindings.forEach(binding => {
-        const input = document.getElementById(binding.id);
-        if (input) {
-            bindInputToGlobal(input, binding.key);
+    // 1. Track manual edits so cached SI values never become stale
+    document.querySelectorAll('input[type="number"]').forEach(input => {
+        if (!input.dataset.siClearedListener) {
+            input.addEventListener('input', () => {
+                delete input.dataset.siValue;
+            });
+            input.dataset.siClearedListener = 'true';
         }
     });
 
-    // 3. Subscribe to changes to update UI
+    // 2. Seed globals from actual DOM input values without overwriting HTML defaults
+    ParameterBindings.forEach(binding => {
+        const input = document.getElementById(binding.id);
+        if (!input) return;
+
+        // Bind listeners and visual marker without clobbering existing HTML input values
+        bindInputToGlobal(input, binding.key, false);
+
+        if (window.GlobalParams.getEffectiveValue(null, binding.key) === null) {
+            const val = readSIInput(binding.id, NaN);
+            if (Number.isFinite(val)) {
+                window.GlobalParams.setGlobal(binding.key, val, 'init');
+            }
+        }
+    });
+
+    // 3. Subscribe to subsequent changes to synchronize bound static & dynamic UI inputs
     window.GlobalParams.subscribe((key, type, value) => {
-        // Update all inputs bound to this key
-        const boundInputs = ParameterBindings.filter(b => b.key === key);
-        boundInputs.forEach(binding => {
+        if (type === 'global' && !Number.isFinite(value)) return;
+        const effectiveValue = (type === 'global' || type === 'import')
+            ? window.GlobalParams.getEffectiveValue(null, key)
+            : value;
+        if (!Number.isFinite(effectiveValue)) return;
+
+        // Synchronize static bound inputs (skip currently focused field)
+        ParameterBindings.filter(b => b.key === key).forEach(binding => {
             const input = document.getElementById(binding.id);
             if (input && document.activeElement !== input) {
-                input.value = value;
+                const unitType = input.dataset.unitType || 'dimensionless';
+                input.dataset.siValue = String(effectiveValue);
+                input.value = AppState.unitSystem === 'imperial'
+                    ? _formatConvertedNumber(UnitConverter.fromSI(effectiveValue, unitType, 'imperial'))
+                    : String(parseFloat(effectiveValue.toFixed(6)));
             }
         });
 
-        // Also update dynamic inputs if they match
-        // (This is handled by local subscription in loadTemplate usually, 
-        // but we can do a global query selector for data-param-key if we implemented that)
+        // Synchronize dynamic Designer inputs matching this global key
         document.querySelectorAll(`[data-global-key="${key}"]`).forEach(input => {
-            if (document.activeElement !== input) {
-                input.value = value;
+            if (document.activeElement !== input && input.closest('#parameterInputs')) {
+                const unitType = input.dataset.unitType || 'dimensionless';
+                input.dataset.siValue = String(effectiveValue);
+                input.value = AppState.unitSystem === 'imperial'
+                    ? _formatConvertedNumber(UnitConverter.fromSI(effectiveValue, unitType, 'imperial'))
+                    : String(parseFloat(effectiveValue.toFixed(6)));
             }
         });
     });
 }
 
-function bindInputToGlobal(input, key) {
+function bindInputToGlobal(input, key, overwriteFromGlobal = false) {
     if (!input || !window.GlobalParams) return;
 
-    // Set initial value from global
-    const globalValue = window.GlobalParams.getEffectiveValue(null, key);
-    if (globalValue !== null && globalValue !== undefined) {
-        input.value = globalValue;
+    if (overwriteFromGlobal) {
+        const globalValue = window.GlobalParams.getEffectiveValue(null, key);
+        if (globalValue !== null && globalValue !== undefined && Number.isFinite(Number(globalValue))) {
+            const unitType = input.dataset.unitType || 'dimensionless';
+            input.dataset.siValue = String(globalValue);
+            input.value = AppState.unitSystem === 'imperial'
+                ? _formatConvertedNumber(UnitConverter.fromSI(Number(globalValue), unitType, 'imperial'))
+                : String(parseFloat(Number(globalValue).toFixed(6)));
+        }
     }
 
-    // Add change listener
-    input.addEventListener('change', (e) => {
-        const value = parseFloat(e.target.value);
-        if (!isNaN(value)) {
-            window.GlobalParams.setGlobal(key, value, 'user-input');
-        }
-    });
+    if (!input.dataset.globalBoundListener) {
+        input.addEventListener('input', () => {
+            delete input.dataset.siValue;
+        });
+        input.addEventListener('change', (e) => {
+            delete input.dataset.siValue;
+            const raw = parseFloat(e.target.value);
+            if (!Number.isNaN(raw)) {
+                const unitType = e.target.dataset.unitType || 'dimensionless';
+                const siVal = UnitConverter.toSI(raw, unitType, AppState.unitSystem);
+                window.GlobalParams.setGlobal(key, siVal, 'user-input');
+            }
+        });
+        input.dataset.globalBoundListener = 'true';
+    }
 
-    // Mark as bound
     input.dataset.globalKey = key;
 
-    // Add visual indicator (Globe icon)
     const wrapper = input.parentElement;
     if (wrapper && wrapper.classList.contains('input-with-unit')) {
         wrapper.classList.add('global-param');
 
-        // Add globe icon if not present
         if (!wrapper.querySelector('.global-icon')) {
             const icon = document.createElement('span');
             icon.className = 'global-icon';
@@ -242,7 +410,6 @@ function bindInputToGlobal(input, key) {
             wrapper.appendChild(icon);
         }
     }
-
 }
 
 function initializeTideStationLogic() {
@@ -251,8 +418,6 @@ function initializeTideStationLogic() {
 
     if (!selector || !rangeInput) return;
 
-    // Station Data (Tidal Range in meters)
-    // Derived from UHSLC Datums (MHHW - MLLW approx or MHHW - MSL * 2)
     const stations = {
         'male': 0.70,       // UHSLC Stn 108
         'gan': 0.78,        // UHSLC Stn 109
@@ -268,17 +433,19 @@ function initializeTideStationLogic() {
             return;
         }
 
-        // Lock input for specific stations
         rangeInput.disabled = true;
         rangeInput.title = `Fixed value for ${selector.options[selector.selectedIndex].text}`;
 
-        const range = stations[station];
-        if (range) {
-            rangeInput.value = range;
-            // Trigger change event to update GlobalParams if bound
-            rangeInput.dispatchEvent(new Event('change'));
+        const rangeSI = stations[station];
+        if (rangeSI) {
+            rangeInput.dataset.siValue = String(rangeSI);
+            rangeInput.value = AppState.unitSystem === 'imperial'
+                ? _formatConvertedNumber(UnitConverter.fromSI(rangeSI, 'length', 'imperial'))
+                : String(rangeSI);
+            if (window.GlobalParams) {
+                window.GlobalParams.setGlobal('tidalRange', rangeSI, 'user-input');
+            }
 
-            // Visual feedback
             const wrapper = rangeInput.parentElement;
             if (wrapper) {
                 const originalBg = wrapper.style.backgroundColor;
@@ -292,220 +459,214 @@ function initializeTideStationLogic() {
     };
 
     selector.addEventListener('change', updateStationState);
-
-    // Run once on load to set initial state
     updateStationState();
 }
 
 // ==========================================
 // INITIALIZATION
 // ==========================================
-document.addEventListener('DOMContentLoaded', () => {
-    console.log('CoastalEngineer Pro - Initializing...');
+if (typeof document !== 'undefined') {
+    document.addEventListener('DOMContentLoaded', () => {
+        console.log('CoastalEngineer Pro - Initializing...');
 
-    // Initialize parameter bindings
-    initializeParameterBindings();
+        initializeParameterBindings();
+        initializeTideStationLogic();
 
-    // Initialize tide station logic
-    initializeTideStationLogic();
-
-
-    // Navigation event listeners
-    document.querySelectorAll('.nav-link').forEach(link => {
-        link.addEventListener('click', (e) => {
-            const page = e.target.dataset.page;
-            if (page) {
-                navigateToPage(page);
-            }
+        // Navigation event listeners
+        document.querySelectorAll('.nav-link').forEach(link => {
+            link.addEventListener('click', (e) => {
+                const page = e.currentTarget.dataset.page;
+                if (page) {
+                    navigateToPage(page);
+                }
+            });
         });
-    });
 
-    // Dashboard feature card navigation
-    document.querySelectorAll('.feature-card').forEach(card => {
-        card.addEventListener('click', (e) => {
-            const page = e.currentTarget.dataset.navigate;
-            if (page) {
-                navigateToPage(page);
-            }
+        // Dashboard Project Wizard button
+        const startWizardBtn = document.getElementById('startProjectWizardBtn');
+        if (startWizardBtn) {
+            startWizardBtn.addEventListener('click', () => {
+                launchProjectWizard();
+            });
+        }
+
+        // Unit toggle button
+        const unitToggle = document.getElementById('unitToggle');
+        if (unitToggle) {
+            unitToggle.addEventListener('click', () => {
+                openModal('unitModal');
+            });
+        }
+
+        // Unit modal close
+        const closeUnitModal = document.getElementById('closeUnitModal');
+        if (closeUnitModal) {
+            closeUnitModal.addEventListener('click', () => {
+                closeModal('unitModal');
+            });
+        }
+
+        // Unit system radio buttons with real value conversion
+        document.querySelectorAll('input[name="unitSystem"]').forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                const prevSystem = AppState.unitSystem;
+                const nextSystem = e.target.value;
+                AppState.unitSystem = nextSystem;
+                UnitConverter.convertAllInputs(prevSystem, nextSystem);
+                updateUnitsDisplay();
+                if (typeof drawStructureOnCanvas === 'function') {
+                    drawStructureOnCanvas(AppState.selectedTemplate);
+                }
+                closeModal('unitModal');
+            });
         });
-    });
 
-    // Unit toggle button
-    const unitToggle = document.getElementById('unitToggle');
-    if (unitToggle) {
-        unitToggle.addEventListener('click', () => {
-            openModal('unitModal');
+        // Template selection buttons (if any exist)
+        document.querySelectorAll('.template-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('.template-btn').forEach(b => b.classList.remove('active'));
+                e.currentTarget.classList.add('active');
+
+                const template = e.currentTarget.dataset.template;
+                AppState.selectedTemplate = template;
+                loadTemplate(template);
+            });
         });
-    }
 
-    // Unit modal close
-    const closeUnitModal = document.getElementById('closeUnitModal');
-    if (closeUnitModal) {
-        closeUnitModal.addEventListener('click', () => {
-            closeModal('unitModal');
+        // Tab switching
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const tabName = e.currentTarget.dataset.tab;
+                const parent = e.currentTarget.closest('.design-results') || e.currentTarget.parentElement.parentElement;
+
+                parent.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                e.currentTarget.classList.add('active');
+
+                parent.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                const targetContent = parent.querySelector(`#${tabName}`);
+                if (targetContent) {
+                    targetContent.classList.add('active');
+                }
+            });
         });
-    }
 
-    // Unit system radio buttons
-    document.querySelectorAll('input[name="unitSystem"]').forEach(radio => {
-        radio.addEventListener('change', (e) => {
-            AppState.unitSystem = e.target.value;
-            updateUnitsDisplay();
-            closeModal('unitModal');
-        });
-    });
+        // Wave calculator
+        const calculateWaves = document.getElementById('calculateWaves');
+        if (calculateWaves) {
+            calculateWaves.addEventListener('click', performWaveCalculations);
+        }
 
-    // Template selection
-    document.querySelectorAll('.template-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            // Remove active class from all
-            document.querySelectorAll('.template-btn').forEach(b => b.classList.remove('active'));
-            // Add to clicked
-            e.currentTarget.classList.add('active');
+        // Serviceability calculator
+        const calculateOvertopping = document.getElementById('calculateOvertopping');
+        if (calculateOvertopping) {
+            calculateOvertopping.addEventListener('click', performOvertoppingCalculations);
+        }
 
-            const template = e.currentTarget.dataset.template;
-            AppState.selectedTemplate = template;
-            loadTemplate(template);
-        });
-    });
+        // Structure analysis
+        const analyzeStructure = document.getElementById('analyzeStructure');
+        if (analyzeStructure) {
+            analyzeStructure.addEventListener('click', performStructureAnalysis);
+        }
 
-    // Tab switching
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const tabName = e.currentTarget.dataset.tab;
-            const parent = e.currentTarget.closest('.design-results') || e.currentTarget.parentElement.parentElement;
+        // Template selection dropdown
+        const templateSelect = document.getElementById('structureTemplateSelect');
+        if (templateSelect) {
+            templateSelect.addEventListener('change', function () {
+                const templateName = this.value;
+                if (templateName) {
+                    AppState.selectedTemplate = templateName;
+                    loadTemplate(templateName);
 
-            // Update buttons
-            parent.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            e.currentTarget.classList.add('active');
+                    const parameterPanel = document.querySelector('.design-parameters');
+                    if (parameterPanel) {
+                        parameterPanel.style.display = 'block';
+                    }
+                }
+            });
+        }
 
-            // Update content
-            parent.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-            const targetContent = parent.querySelector(`#${tabName}`);
-            if (targetContent) {
-                targetContent.classList.add('active');
-            }
-        });
-    });
+        // Keep designer parameters visible for default template
+        const parameterPanel = document.querySelector('.design-parameters');
+        if (parameterPanel) {
+            parameterPanel.style.display = 'block';
+        }
 
-    // Wave calculator
-    const calculateWaves = document.getElementById('calculateWaves');
-    if (calculateWaves) {
-        calculateWaves.addEventListener('click', performWaveCalculations);
-    }
+        // PDF Export
+        const exportPDF = document.getElementById('exportPDF');
+        const generateReport = document.getElementById('generateReport');
 
-    // Serviceability calculator
-    const calculateOvertopping = document.getElementById('calculateOvertopping');
-    if (calculateOvertopping) {
-        calculateOvertopping.addEventListener('click', performOvertoppingCalculations);
-    }
+        if (exportPDF) {
+            exportPDF.addEventListener('click', () => {
+                navigateToPage('reports');
+            });
+        }
 
-    // Structure analysis
-    const analyzeStructure = document.getElementById('analyzeStructure');
-    if (analyzeStructure) {
-        analyzeStructure.addEventListener('click', performStructureAnalysis);
-    }
+        if (generateReport) {
+            generateReport.addEventListener('click', generatePDFReport);
+        }
 
-    // Template selection dropdown
-    const templateSelect = document.getElementById('structureTemplateSelect');
-    if (templateSelect) {
-        templateSelect.addEventListener('change', function () {
-            const templateName = this.value;
-            if (templateName) {
-                AppState.selectedTemplate = templateName;
-                loadTemplate(templateName);
+        // Canvas controls
+        const zoomIn = document.getElementById('zoomIn');
+        const zoomOut = document.getElementById('zoomOut');
+        const resetView = document.getElementById('resetView');
 
-                // Show the parameter panel (it's hidden by default)
-                const parameterPanel = document.querySelector('.design-parameters');
-                if (parameterPanel) {
-                    parameterPanel.style.display = 'block';
+        if (zoomIn) zoomIn.addEventListener('click', () => canvasZoom(1.2));
+        if (zoomOut) zoomOut.addEventListener('click', () => canvasZoom(0.8));
+        if (resetView) {
+            resetView.addEventListener('click', () => {
+                if (typeof resetCanvasView === 'function') {
+                    resetCanvasView();
+                } else if (typeof drawStructureOnCanvas === 'function') {
+                    drawStructureOnCanvas(AppState.selectedTemplate);
+                }
+            });
+        }
+
+        // Save to Library button
+        const saveToLibrary = document.getElementById('saveToLibrary');
+        if (saveToLibrary) {
+            saveToLibrary.addEventListener('click', () => {
+                if (typeof saveCurrentStructureToLibrary === 'function') {
+                    saveCurrentStructureToLibrary();
+                }
+            });
+        }
+
+        // Delegated navigation for all elements with [data-navigate]
+        document.addEventListener('click', (e) => {
+            const navButton = e.target.closest('[data-navigate]');
+            if (navButton) {
+                const page = navButton.dataset.navigate;
+                if (page) {
+                    navigateToPage(page);
                 }
             }
         });
-    }
 
-    // Hide parameters initially until a template is selected
-    const parameterPanel = document.querySelector('.design-parameters');
-    if (parameterPanel) {
-        parameterPanel.style.display = 'none';
-    }
+        // Load recent saved structures on dashboard
+        loadRecentProjects();
 
-    // PDF Export
-    const exportPDF = document.getElementById('exportPDF');
-    const generateReport = document.getElementById('generateReport');
+        // Initialize default template visibly
+        loadTemplate('rubble-standard');
+        updateUnitsDisplay();
 
-    if (exportPDF) {
-        exportPDF.addEventListener('click', () => {
-            navigateToPage('reports');
-        });
-    }
-
-    if (generateReport) {
-        generateReport.addEventListener('click', generatePDFReport);
-    }
-
-    // Canvas controls
-    const zoomIn = document.getElementById('zoomIn');
-    const zoomOut = document.getElementById('zoomOut');
-    const resetView = document.getElementById('resetView');
-
-    if (zoomIn) zoomIn.addEventListener('click', () => canvasZoom(1.2));
-    if (zoomOut) zoomOut.addEventListener('click', () => canvasZoom(0.8));
-    const resetCanvasViewLocal = () => {
-        // Redraw structure which resets any zoom contexts?
-        // Actually zoom is likely handled in canvas.js vars.
-        // Assuming canvasZoom resets if needed or just re-draws.
-        // If canvas.js exposes a reset function, call it.
-        // If not, simply redrawing usually fits the view.
-        if (typeof drawStructureOnCanvas === 'function') {
-            drawStructureOnCanvas();
-        }
-    };
-    if (resetView) resetView.addEventListener('click', resetCanvasViewLocal);
-
-    // Save to Library button
-    const saveToLibrary = document.getElementById('saveToLibrary');
-    if (saveToLibrary) {
-        saveToLibrary.addEventListener('click', () => {
-            if (typeof saveCurrentStructureToLibrary === 'function') {
-                saveCurrentStructureToLibrary();
-            }
-        });
-    }
-
-    // Add event listeners for all buttons with data-navigate attribute
-    document.addEventListener('click', (e) => {
-        const navButton = e.target.closest('[data-navigate]');
-        if (navButton) {
-            const page = navButton.dataset.navigate;
-            if (page) {
-                navigateToPage(page);
-            }
-        }
-    });
-
-    // Load recent projects on dashboard
-    loadRecentProjects();
-
-    // Initialize default template
-    loadTemplate('rubble-standard');
-
-    // Render formulas if KaTeX is available
-    if (typeof renderMathInElement !== 'undefined') {
-        setTimeout(() => {
-            document.querySelectorAll('.formula').forEach(el => {
-                renderMathInElement(el, {
-                    delimiters: [
-                        { left: '$$', right: '$$', display: true },
-                        { left: '$', right: '$', display: false }
-                    ]
+        // Render formulas if KaTeX is available
+        if (typeof renderMathInElement !== 'undefined') {
+            setTimeout(() => {
+                document.querySelectorAll('.formula').forEach(el => {
+                    renderMathInElement(el, {
+                        delimiters: [
+                            { left: '$$', right: '$$', display: true },
+                            { left: '$', right: '$', display: false }
+                        ]
+                    });
                 });
-            });
-        }, 500);
-    }
+            }, 500);
+        }
 
-    console.log('CoastalEngineer Pro - Ready!');
-});
+        console.log('CoastalEngineer Pro - Ready!');
+    });
+}
 
 // ==========================================
 // PROJECT WIZARD LAUNCHER
@@ -538,22 +699,18 @@ window.launchProjectWizard = launchProjectWizard;
 // ==========================================
 // TEMPLATE LOADING
 // ==========================================
-function loadTemplate(templateName) {
-    const parameterInputs = document.getElementById('parameterInputs');
-    if (!parameterInputs) return;
-
-    // Clear existing inputs
-    parameterInputs.innerHTML = '';
-
-    // Prepare Armour Options (used by multiple structure types)
-    let armourOptions = [];
-    if (window.ArmourTypes) {
-        armourOptions = Object.keys(window.ArmourTypes).map(k => ({ value: k, label: window.ArmourTypes[k].name }));
-    } else {
-        armourOptions = [{ value: 'rock_angular', label: 'Default Rock' }];
+function _getArmourSelectOptions() {
+    const types = (typeof ArmourTypes !== 'undefined' && ArmourTypes)
+        ? ArmourTypes
+        : (typeof window !== 'undefined' ? window.ArmourTypes : null);
+    if (types) {
+        return Object.keys(types).map(k => ({ value: k, label: types[k].name }));
     }
+    return [{ value: 'rock_angular', label: 'Default Rock' }];
+}
 
-    // Define parameters based on template
+function getTemplateParameters(templateName) {
+    const armourOptions = _getArmourSelectOptions();
     let parameters = [];
 
     switch (templateName) {
@@ -792,6 +949,29 @@ function loadTemplate(templateName) {
             ];
             break;
 
+        case 'rubble-reef':
+            // Submerged / Reef Breakwater (d'Angremond wave transmission & Hudson stability)
+            parameters = [
+                { type: 'group', label: 'General Structure' },
+                { label: 'Crest Freeboard (Rc, - if submerged)', unit: 'm', id: 'crestHeight', value: -0.5, step: 0.1, tooltipKey: 'crest-elevation' },
+                { label: 'Crest Width (B)', unit: 'm', id: 'crestWidth', value: 8.0, tooltipKey: 'crest-width' },
+                { label: 'Seaward Slope (cotα)', id: 'slopeLeft', value: 2.0, step: 0.1, tooltipKey: 'structure-slope' },
+                { label: 'Leeward Slope (cotα)', id: 'slopeRight', value: 2.0, step: 0.1, tooltipKey: 'structure-slope' },
+                { label: 'Water Depth at Toe (d)', unit: 'm', id: 'depth', value: 4.0, tooltipKey: 'water-depth' },
+
+                { type: 'group', label: 'Armour Layer' },
+                { label: 'Armour Type', id: 'armourType', value: 'rock_angular', type: 'select', options: armourOptions },
+                { label: 'Armour Stone Dn50', unit: 'm', id: 'armourDn50', value: 1.0, tooltipKey: 'armour-dn50' },
+                { label: 'Material Density (ρs)', unit: 'kg/m³', id: 'matDensity', value: 2650, tooltipKey: 'material-density' },
+                { label: 'Stability Coeff (Kd)', id: 'matKd', value: 3.5, tooltipKey: 'stability-coefficient' },
+                { label: 'Porosity (n)', id: 'matPorosity', value: 0.40, tooltipKey: 'porosity' },
+
+                { type: 'group', label: 'Wave Parameters' },
+                { label: 'Design Wave Height (Hs)', unit: 'm', id: 'waveHeight', value: 2.5, tooltipKey: 'wave-height' },
+                { label: 'Wave Period (Tp)', unit: 's', id: 'wavePeriod', value: 8.0, tooltipKey: 'wave-period' }
+            ];
+            break;
+
 
 
         case 'rubble-low':
@@ -939,7 +1119,45 @@ function loadTemplate(templateName) {
             ];
             break;
 
-        // Add more templates as needed
+        case 'custom':
+            // Flexible Custom Coastal Structure
+            parameters = [
+                { type: 'group', label: 'Custom Structure Type' },
+                {
+                    label: 'Structural Behavior Family',
+                    id: 'structureFamily',
+                    value: 'rubble',
+                    type: 'select',
+                    options: [
+                        { value: 'rubble', label: 'Rubble Mound Section' },
+                        { value: 'vertical', label: 'Vertical Wall / Gravity Structure' }
+                    ]
+                },
+                { label: 'Water Depth at Toe (d)', unit: 'm', id: 'depth', value: 5.0, tooltipKey: 'water-depth' },
+
+                { type: 'group', label: 'Geometry' },
+                { label: 'Crest Freeboard / Elevation (Rc)', unit: 'm', id: 'crestHeight', value: 3.5, tooltipKey: 'crest-elevation' },
+                { label: 'Crest Width (B)', unit: 'm', id: 'crestWidth', value: 5.0, tooltipKey: 'crest-width' },
+                { label: 'Seaward Slope (cotα)', id: 'slopeLeft', value: 1.5, step: 0.1, tooltipKey: 'structure-slope' },
+                { label: 'Leeward Slope (cotα)', id: 'slopeRight', value: 1.5, step: 0.1, tooltipKey: 'structure-slope' },
+                { label: 'Wall Height (hc, if vertical)', unit: 'm', id: 'wallHeight', value: 8.0, tooltipKey: 'wall-height' },
+                { label: 'Wall Thickness / Width (t)', unit: 'm', id: 'wallThickness', value: 2.5, tooltipKey: 'wall-thickness' },
+                { label: 'Foundation Width (Bf)', unit: 'm', id: 'foundationWidth', value: 8.0, tooltipKey: 'foundation-width' },
+
+                { type: 'group', label: 'Material Properties' },
+                { label: 'Armour Type', id: 'armourType', value: 'rock_angular', type: 'select', options: armourOptions },
+                { label: 'Armour Stone Dn50', unit: 'm', id: 'armourDn50', value: 1.2, tooltipKey: 'armour-dn50' },
+                { label: 'Rock Density (ρs)', unit: 'kg/m³', id: 'matDensity', value: 2650, tooltipKey: 'material-density' },
+                { label: 'Stability Coeff (Kd)', id: 'matKd', value: 4.0, tooltipKey: 'stability-coefficient' },
+                { label: 'Concrete Density (ρc)', unit: 'kg/m³', id: 'concreteDensity', value: 2400, tooltipKey: 'concrete-density' },
+                { label: 'Friction Coefficient (μ)', id: 'frictionCoeff', value: 0.6, step: 0.05, tooltipKey: 'friction-coeff' },
+
+                { type: 'group', label: 'Wave Conditions' },
+                { label: 'Design Wave Height (Hs)', unit: 'm', id: 'waveHeight', value: 3.0, tooltipKey: 'wave-height' },
+                { label: 'Wave Period (Tp)', unit: 's', id: 'wavePeriod', value: 8.0, tooltipKey: 'wave-period' }
+            ];
+            break;
+
         default:
             parameters = [
                 { label: 'Structure Height', unit: 'm', id: 'height', value: 5.0 },
@@ -947,8 +1165,33 @@ function loadTemplate(templateName) {
             ];
     }
 
-    // Create form groups for each parameter
-    parameterInputs.innerHTML = ''; // Clear previous
+    return parameters;
+}
+
+function loadTemplate(templateName) {
+    AppState.selectedTemplate = templateName;
+
+    if (typeof document === 'undefined') {
+        return getTemplateParameters(templateName);
+    }
+
+    const templateSelect = document.getElementById('structureTemplateSelect');
+    if (templateSelect && templateSelect.value !== templateName) {
+        templateSelect.value = templateName;
+    }
+
+    const parameterPanel = document.querySelector('.design-parameters');
+    if (parameterPanel) {
+        parameterPanel.style.display = 'block';
+    }
+
+    const parameterInputs = document.getElementById('parameterInputs');
+    if (!parameterInputs) return [];
+
+    const parameters = getTemplateParameters(templateName);
+
+    // Clear existing inputs
+    parameterInputs.innerHTML = '';
 
     // Create a two-column grid container
     const gridContainer = document.createElement('div');
@@ -959,7 +1202,6 @@ function loadTemplate(templateName) {
     `;
 
     parameters.forEach(param => {
-        // Handle group headers
         if (param.type === 'group') {
             const groupHeader = document.createElement('div');
             groupHeader.className = 'parameter-group-header';
@@ -975,54 +1217,65 @@ function loadTemplate(templateName) {
             `;
             groupHeader.textContent = param.label;
             gridContainer.appendChild(groupHeader);
-            return; // Skip to next parameter
+            return;
         }
 
         const formGroup = document.createElement('div');
         formGroup.className = 'form-group';
 
-        let inputHTML = '';
+        const domId = `design_${param.id}`;
         const paramType = param.type || 'number';
+        const unitType = _mapUnitToType(param.unit);
+        const unitLabel = param.unit ? UnitConverter.getUnitLabel(unitType, AppState.unitSystem) : '';
+        const stringSelect = ['armourType', 'filterType', 'toeType', 'structureFamily'].includes(param.id);
 
+        let inputHTML = '';
         if (paramType === 'select') {
             const options = param.options || [];
             const optsHTML = options.map(o => {
                 const val = typeof o === 'object' ? o.value : o;
                 const lab = typeof o === 'object' ? o.label : o;
                 const isSelected = val == param.value ? 'selected' : '';
-                return `<option value="${val}" ${isSelected}>${lab}</option>`;
+                return `<option value="${escapeHtml(val)}" ${isSelected}>${escapeHtml(lab)}</option>`;
             }).join('');
-            inputHTML = `<select id="${param.id}" class="form-control">${optsHTML}</select>`;
+            inputHTML = `<select id="${domId}" data-param-id="${param.id}" ${stringSelect ? 'data-value-type="string"' : ''} class="form-control">${optsHTML}</select>`;
         } else if (paramType === 'checkbox') {
             inputHTML = `
                 <div class="checkbox-wrapper" style="display:flex; align-items:center;">
-                    <input type="checkbox" id="${param.id}" ${param.value ? 'checked' : ''} style="width:auto; margin-right:10px;">
+                    <input type="checkbox" id="${domId}" data-param-id="${param.id}" ${param.value ? 'checked' : ''} style="width:auto; margin-right:10px;">
                     <span style="font-size:0.9em; color:var(--topography-600);">Enable</span>
                 </div>`;
-        } else if (paramType === 'readonly') {
-            inputHTML = `
-                <div class="input-with-unit">
-                    <input type="number" id="${param.id}" value="${param.value}" step="${param.step || 0.1}" readonly style="background-color: var(--md-sys-color-surface-variant); cursor: not-allowed;">
-                    <span class="unit">${param.unit || ''}</span>
-                </div>`;
         } else {
-            // Number input with optional datalist for suggestions
-            const datalistId = param.datalist ? `${param.id}-datalist` : '';
-            const datalistHTML = param.datalist ? `
-                <datalist id="${datalistId}">
-                    ${param.datalist.map(val => `<option value="${val}">1/${val}</option>`).join('')}
-                </datalist>` : '';
+            const siNum = Number(param.value);
+            const displayVal = (AppState.unitSystem === 'imperial' && Number.isFinite(siNum))
+                ? _formatConvertedNumber(UnitConverter.fromSI(siNum, unitType, 'imperial'))
+                : param.value;
+            const siAttr = Number.isFinite(siNum) ? `data-si-value="${siNum}"` : '';
 
-            inputHTML = `
-                <div class="input-with-unit">
-                    <input type="number" id="${param.id}" value="${param.value}" step="${param.step || 0.1}" 
-                           min="${param.min || ''}" placeholder="${param.placeholder || ''}"
-                           ${datalistId ? `list="${datalistId}"` : ''}>
-                    <span class="unit">${param.unit || ''}</span>
-                </div>${datalistHTML}`;
+            if (paramType === 'readonly') {
+                inputHTML = `
+                    <div class="input-with-unit">
+                        <input type="number" id="${domId}" data-param-id="${param.id}" data-unit-type="${unitType}" ${siAttr} value="${displayVal}" step="${param.step || 0.1}" readonly style="background-color: var(--md-sys-color-surface-variant); cursor: not-allowed;">
+                        <span class="unit" data-unit-type="${unitType}">${unitLabel}</span>
+                    </div>`;
+            } else {
+                const datalistId = param.datalist ? `${domId}-datalist` : '';
+                const datalistHTML = param.datalist ? `
+                    <datalist id="${datalistId}">
+                        ${param.datalist.map(val => `<option value="${val}">1/${val}</option>`).join('')}
+                    </datalist>` : '';
+
+                inputHTML = `
+                    <div class="input-with-unit">
+                        <input type="number" id="${domId}" data-param-id="${param.id}" data-unit-type="${unitType}" ${siAttr} value="${displayVal}" step="${param.step || 0.1}"
+                               min="${param.min !== undefined ? param.min : ''}" placeholder="${param.placeholder || ''}"
+                               ${datalistId ? `list="${datalistId}"` : ''}>
+                        <span class="unit" data-unit-type="${unitType}">${unitLabel}</span>
+                    </div>${datalistHTML}`;
+            }
         }
 
-        formGroup.innerHTML = `<label data-tooltip-key="${param.tooltipKey || param.id}">${param.label}</label>${inputHTML}`;
+        formGroup.innerHTML = `<label for="${domId}" data-tooltip-key="${param.tooltipKey || param.id}">${escapeHtml(param.label)}</label>${inputHTML}`;
         gridContainer.appendChild(formGroup);
 
         // Attach Tooltip
@@ -1033,44 +1286,51 @@ function loadTemplate(templateName) {
             if (labelEl) tipSystem.addTooltip(labelEl, key);
         }
 
-        // Bind dynamic inputs to global parameters if applicable
-        if (param.id === 'depth') {
-            const input = formGroup.querySelector('input');
-            if (input && typeof bindInputToGlobal === 'function') {
-                bindInputToGlobal(input, 'toeDepth');
-            }
+        // Bind dynamic depth/waveHeight/wavePeriod to global parameters if present (without clobbering template defaults)
+        const ctrl = formGroup.querySelector(`#${domId}`);
+        if (ctrl) {
+            if (param.id === 'depth') bindInputToGlobal(ctrl, 'toeDepth', false);
+            if (param.id === 'waveHeight') bindInputToGlobal(ctrl, 'waveHeight', false);
+            if (param.id === 'wavePeriod') bindInputToGlobal(ctrl, 'wavePeriod', false);
         }
 
-        // Specific Logic for Armour Type Change (Auto-update properties)
-        if (param.id === 'armourType' && window.ArmourTypes) {
-            const selectEl = formGroup.querySelector('select');
-            if (selectEl) {
-                selectEl.addEventListener('change', (e) => {
+        // Specific Logic for Armour Type Change (Auto-update properties in SI & current UI unit)
+        if (param.id === 'armourType') {
+            const types = (typeof ArmourTypes !== 'undefined' && ArmourTypes) ? ArmourTypes : window.ArmourTypes;
+            if (types && ctrl) {
+                ctrl.addEventListener('change', (e) => {
                     const type = e.target.value;
-                    const data = window.ArmourTypes[type];
+                    const data = types[type];
                     if (data && type !== 'user_defined') {
-                        // Update inputs
-                        const setVal = (id, val) => {
-                            const input = document.getElementById(id);
-                            if (input) input.value = val;
+                        const setSIVal = (key, siVal) => {
+                            const target = getDesignInput(key);
+                            if (!target) return;
+                            const uType = target.dataset.unitType || 'dimensionless';
+                            target.dataset.siValue = String(siVal);
+                            target.value = AppState.unitSystem === 'imperial'
+                                ? _formatConvertedNumber(UnitConverter.fromSI(siVal, uType, 'imperial'))
+                                : String(siVal);
                         };
-                        setVal('matDensity', data.rho);
-                        setVal('matKd', data.kd);
-                        setVal('matPorosity', data.porosity);
+                        setSIVal('matDensity', data.rho);
+                        setSIVal('matKd', data.kd);
+                        setSIVal('matPorosity', data.porosity);
                     }
                 });
             }
         }
 
-        // Add listener for redraw
-        const inputElem = document.getElementById(param.id);
-        if (inputElem) {
-            inputElem.addEventListener('input', () => {
+        // Redraw canvas & clear stale cached SI value on manual input
+        if (ctrl) {
+            ctrl.addEventListener('input', () => {
+                delete ctrl.dataset.siValue;
                 if (typeof drawStructureOnCanvas === 'function') {
                     drawStructureOnCanvas(templateName);
                 }
             });
-            inputElem.addEventListener('change', () => { // For select/checkbox
+            ctrl.addEventListener('change', () => {
+                if (ctrl.type === 'number') {
+                    delete ctrl.dataset.siValue;
+                }
                 if (typeof drawStructureOnCanvas === 'function') {
                     drawStructureOnCanvas(templateName);
                 }
@@ -1078,147 +1338,125 @@ function loadTemplate(templateName) {
         }
     });
 
-    // Append the grid container to the parameter inputs area
     parameterInputs.appendChild(gridContainer);
 
-    // Function to update calculated crest width display
-    function updateCrestWidthDisplay() {
-        const multiplier = parseInt(document.getElementById('crestWidthMultiplier')?.value || 3);
-        const Dn50 = parseFloat(document.getElementById('armourDn50')?.value || 1.2);
-        const crestWidth = multiplier * Dn50;
+    const _setDisplaySI = (key, siVal, decimals = 2) => {
+        const displayInput = getDesignInput(key);
+        if (!displayInput) return;
+        const unitType = displayInput.dataset.unitType || 'length';
+        displayInput.dataset.siValue = String(siVal);
+        const uiVal = UnitConverter.fromSI(siVal, unitType, AppState.unitSystem);
+        displayInput.value = uiVal.toFixed(decimals);
+    };
 
-        const displayInput = document.getElementById('crestWidthDisplay');
-        if (displayInput) {
-            displayInput.value = crestWidth.toFixed(2);
-        }
+    function updateCrestWidthDisplay() {
+        const multiplier = getDesignValue('crestWidthMultiplier', 3);
+        const Dn50 = getDesignValue('armourDn50', 1.2);
+        const crestWidth = multiplier * Dn50;
+        _setDisplaySI('crestWidthDisplay', crestWidth, 2);
     }
 
-    // Add listeners to update crest width when dependencies change
-    const crestWidthDeps = ['crestWidthMultiplier', 'armourDn50'];
-    crestWidthDeps.forEach(id => {
-        const elem = document.getElementById(id);
+    ['crestWidthMultiplier', 'armourDn50'].forEach(key => {
+        const elem = getDesignInput(key);
         if (elem) {
             elem.addEventListener('change', updateCrestWidthDisplay);
             elem.addEventListener('input', updateCrestWidthDisplay);
         }
     });
-
-    // Initial update
     updateCrestWidthDisplay();
 
-    // Function to update calculated toe width displays
     function updateToeWidthDisplay() {
-        const armourDn50 = parseFloat(document.getElementById('armourDn50')?.value || 1.2);
-        const toeRatio = parseInt(document.getElementById('toeWeightRatio')?.value || 10);
-        const multiplier = parseInt(document.getElementById('toeWidthMultiplier')?.value || 4);
-
-        // Calculate toe stone size from weight ratio
-        const Dn50_toe = armourDn50 / Math.pow(toeRatio, 1 / 3);
+        const armourDn50 = getDesignValue('armourDn50', 1.2);
+        const toeRatio = getDesignValue('toeWeightRatio', 10);
+        const multiplier = getDesignValue('toeWidthMultiplier', 4);
+        const Dn50_toe = armourDn50 / Math.pow(Math.max(1, toeRatio), 1 / 3);
         const toeWidth = multiplier * Dn50_toe;
 
-        const leftDisplay = document.getElementById('toeLeftWidthDisplay');
-        const rightDisplay = document.getElementById('toeRightWidthDisplay');
-
-        if (leftDisplay) leftDisplay.value = toeWidth.toFixed(2);
-        if (rightDisplay) rightDisplay.value = toeWidth.toFixed(2);
+        _setDisplaySI('toeLeftWidthDisplay', toeWidth, 2);
+        _setDisplaySI('toeRightWidthDisplay', toeWidth, 2);
+        _setDisplaySI('toeWidthDisplay', toeWidth, 2);
     }
 
-    // Function to update calculated layer Dn50 displays
     function updateLayerDn50Displays() {
-        const armourDn50 = parseFloat(document.getElementById('armourDn50')?.value || 1.2);
+        const armourDn50 = getDesignValue('armourDn50', 1.2);
+        const filterRatio = getDesignValue('filterWeightRatio', 10);
+        const toeRatio = getDesignValue('toeWeightRatio', 10);
+        const coreRatio = getDesignValue('coreWeightRatio', 200);
 
-        // Get weight ratios
-        const filterRatio = parseInt(document.getElementById('filterWeightRatio')?.value || 10);
-        const toeRatio = parseInt(document.getElementById('toeWeightRatio')?.value || 10);
-        const coreRatio = parseInt(document.getElementById('coreWeightRatio')?.value || 200);
+        const filterDn50 = armourDn50 / Math.pow(Math.max(1, filterRatio), 1 / 3);
+        const toeDn50 = armourDn50 / Math.pow(Math.max(1, toeRatio), 1 / 3);
+        const coreDn50 = armourDn50 / Math.pow(Math.max(1, coreRatio), 1 / 3);
 
-        // Calculate Dn50 for each layer: Dn50_layer = Dn50_armour / ratio^(1/3)
-        const filterDn50 = armourDn50 / Math.pow(filterRatio, 1 / 3);
-        const toeDn50 = armourDn50 / Math.pow(toeRatio, 1 / 3);
-        const coreDn50 = armourDn50 / Math.pow(coreRatio, 1 / 3);
+        _setDisplaySI('filterDn50Display', filterDn50, 3);
+        _setDisplaySI('toeDn50Display', toeDn50, 3);
+        _setDisplaySI('coreDn50Display', coreDn50, 3);
 
-        // Update displays
-        const filterDisplay = document.getElementById('filterDn50Display');
-        const toeDisplay = document.getElementById('toeDn50Display');
-        const coreDisplay = document.getElementById('coreDn50Display');
-
-        if (filterDisplay) filterDisplay.value = filterDn50.toFixed(3);
-        if (toeDisplay) toeDisplay.value = toeDn50.toFixed(3);
-        if (coreDisplay) coreDisplay.value = coreDn50.toFixed(3);
-
-        // Also update toe width since it depends on toe Dn50
         updateToeWidthDisplay();
     }
 
-    // Add listeners to update layer Dn50 when dependencies change
-    const layerDn50Deps = ['armourDn50', 'filterWeightRatio', 'toeWeightRatio', 'coreWeightRatio'];
-    layerDn50Deps.forEach(id => {
-        const elem = document.getElementById(id);
+    ['armourDn50', 'filterWeightRatio', 'toeWeightRatio', 'coreWeightRatio'].forEach(key => {
+        const elem = getDesignInput(key);
         if (elem) {
             elem.addEventListener('change', updateLayerDn50Displays);
             elem.addEventListener('input', updateLayerDn50Displays);
         }
     });
 
-    // Add listener for toe width multiplier
-    const toeWidthMultElem = document.getElementById('toeWidthMultiplier');
+    const toeWidthMultElem = getDesignInput('toeWidthMultiplier');
     if (toeWidthMultElem) {
         toeWidthMultElem.addEventListener('change', updateToeWidthDisplay);
     }
 
-    // Initial updates
     updateLayerDn50Displays();
 
-    // Redraw canvas with new template (if canvas is available)
     if (typeof drawStructureOnCanvas === 'function') {
         drawStructureOnCanvas(templateName);
     }
+
+    return parameters;
 }
 
 // ==========================================
-// DASHBOARD - RECENT PROJECTS
+// DASHBOARD - RECENT SAVED STRUCTURES
 // ==========================================
-function loadRecentProjects() {
+async function loadRecentProjects() {
     const recentProjectsGrid = document.getElementById('recentProjectsGrid');
     if (!recentProjectsGrid) return;
 
-    // Get structures from library (using the library module if available)
     let structures = [];
-
-    if (typeof StructureLibrary !== 'undefined' && typeof StructureLibrary.getAllStructures === 'function') {
-        structures = StructureLibrary.getAllStructures();
+    try {
+        if (typeof StructureLibrary !== 'undefined' && typeof StructureLibrary.getAllStructures === 'function') {
+            const loaded = await StructureLibrary.getAllStructures();
+            if (Array.isArray(loaded)) {
+                structures = loaded;
+            }
+        }
+    } catch (err) {
+        console.warn('Could not load recent structures:', err);
     }
 
-    // Ensure structures is an array before sorting
-    if (!Array.isArray(structures)) {
-        structures = [];
-    }
-
-    // Sort by date modified (most recent first) and take top 3
     const recentStructures = structures
+        .slice()
         .sort((a, b) => new Date(b.dateModified) - new Date(a.dateModified))
         .slice(0, 3);
 
-    // Clear the grid
     recentProjectsGrid.innerHTML = '';
 
     if (recentStructures.length === 0) {
-        // Show empty state
         recentProjectsGrid.innerHTML = `
             <div class="empty-library-state">
                 <div class="empty-icon">📚</div>
-                <h3>No Projects Yet</h3>
+                <h3>No Saved Structures Yet</h3>
                 <p>Start designing coastal structures and save them to your library</p>
                 <button class="btn-primary" data-navigate="designer">
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                         <path d="M8 3V13M3 8H13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                     </svg>
-                    Create Your First Project
+                    Open Structure Designer
                 </button>
             </div>
         `;
     } else {
-        // Display recent projects
         recentStructures.forEach(structure => {
             const projectCard = createProjectCard(structure);
             recentProjectsGrid.appendChild(projectCard);
@@ -1231,20 +1469,22 @@ function createProjectCard(structure) {
     card.className = 'project-card';
     card.dataset.structureId = structure.id;
 
-    // Format date
     const date = new Date(structure.dateModified);
-    const formattedDate = date.toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric'
-    });
+    const formattedDate = Number.isNaN(date.getTime())
+        ? 'Recent'
+        : date.toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
+        });
 
-    // Get type label
     const typeLabels = {
         'rubble-standard': 'Rubble Mound',
+        'rubble-bullnose': 'Rubble Mound (Bullnose)',
         'rubble-berm': 'Berm Breakwater',
-        'rubble-reef': 'Reef',
+        'rubble-reef': 'Reef Breakwater',
         'rubble-low': 'Low-Crested',
+        'rubble-revetment': 'Revetment',
         'vertical-wall': 'Vertical Wall',
         'vertical-composite': 'Composite',
         'vertical-caisson': 'Caisson',
@@ -1252,43 +1492,45 @@ function createProjectCard(structure) {
         'custom': 'Custom'
     };
 
-    const typeLabel = typeLabels[structure.type] || structure.type;
+    const typeLabel = typeLabels[structure.type] || structure.type || 'Structure';
 
     card.innerHTML = `
         <div class="project-header">
-            <span class="project-type-badge">${typeLabel}</span>
+            <span class="project-type-badge">${escapeHtml(typeLabel)}</span>
         </div>
-        <h3>${structure.name || 'Untitled Structure'}</h3>
+        <h3>${escapeHtml(structure.name || 'Untitled Structure')}</h3>
         <div class="project-meta">
             <div class="project-meta-item">
                 <span>📅</span>
-                <span>${formattedDate}</span>
+                <span>${escapeHtml(formattedDate)}</span>
             </div>
             ${structure.projectName ? `
                 <div class="project-meta-item">
                     <span>📁</span>
-                    <span>${structure.projectName}</span>
+                    <span>${escapeHtml(structure.projectName)}</span>
                 </div>
             ` : ''}
         </div>
         ${structure.description ? `
-            <p class="project-description">${structure.description}</p>
+            <p class="project-description">${escapeHtml(structure.description)}</p>
         ` : `
-            <p class="project-description">Coastal structure design saved on ${formattedDate}</p>
+            <p class="project-description">Coastal structure design saved on ${escapeHtml(formattedDate)}</p>
         `}
-        ${structure.tags && structure.tags.length > 0 ? `
+        ${Array.isArray(structure.tags) && structure.tags.length > 0 ? `
             <div class="project-tags">
-                ${structure.tags.map(tag => `<span class="project-tag">${tag}</span>`).join('')}
+                ${structure.tags.map(tag => `<span class="project-tag">${escapeHtml(tag)}</span>`).join('')}
             </div>
         ` : ''}
     `;
 
-    // Add click handler to load the structure
     card.addEventListener('click', () => {
-        if (typeof loadStructureFromLibrary === 'function') {
+        if (typeof loadStructureForEditing === 'function') {
+            loadStructureForEditing(structure.id);
+        } else if (typeof loadStructureFromLibrary === 'function') {
             loadStructureFromLibrary(structure.id);
+        } else {
+            navigateToPage('designer');
         }
-        navigateToPage('designer');
     });
 
     return card;
@@ -1297,7 +1539,34 @@ function createProjectCard(structure) {
 // ==========================================
 // EXPORT FUNCTIONS
 // ==========================================
-window.AppState = AppState;
-window.navigateToPage = navigateToPage;
-window.updateUnitsDisplay = updateUnitsDisplay;
-window.loadRecentProjects = loadRecentProjects;
+if (typeof window !== 'undefined') {
+    window.AppState = AppState;
+    window.UnitConverter = UnitConverter;
+    window.convertUnit = convertUnit;
+    window.escapeHtml = escapeHtml;
+    window.getDesignInput = getDesignInput;
+    window.getDesignValue = getDesignValue;
+    window.readSIInput = readSIInput;
+    window.getTemplateParameters = getTemplateParameters;
+    window.navigateToPage = navigateToPage;
+    window.loadTemplate = loadTemplate;
+    window.updateUnitsDisplay = updateUnitsDisplay;
+    window.loadRecentProjects = loadRecentProjects;
+    window.openModal = openModal;
+    window.closeModal = closeModal;
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = {
+        AppState,
+        UnitConverter,
+        convertUnit,
+        escapeHtml,
+        getDesignInput,
+        getDesignValue,
+        readSIInput,
+        getTemplateParameters,
+        navigateToPage,
+        loadTemplate
+    };
+}

@@ -21,14 +21,21 @@ function calculateDeepWaterWavelength(T) {
  * @returns {number} Local wavelength L (m)
  */
 function calculateLocalWavelength(T, d) {
+    if (T <= 0 || d <= 0) return 0;
     const g = 9.81;
     const L0 = calculateDeepWaterWavelength(T);
 
-    // Iterative solution
-    let L = L0;
-    for (let i = 0; i < 10; i++) {
+    // Iterative dispersion solution with convergence tolerance
+    let L = L0 * Math.tanh(Math.pow((2 * Math.PI * Math.sqrt(d / g)) / T, 1.5));
+    if (!Number.isFinite(L) || L <= 0) L = L0;
+    for (let i = 0; i < 50; i++) {
         const k = (2 * Math.PI) / L;
-        L = L0 * Math.tanh(k * d);
+        const nextL = L0 * Math.tanh(k * d);
+        if (Math.abs(nextL - L) < 1e-6) {
+            L = nextL;
+            break;
+        }
+        L = nextL;
     }
 
     return L;
@@ -52,16 +59,18 @@ function calculateGroupVelocityFactor(k, d) {
 }
 
 /**
- * Calculate shoaling coefficient
- * Ks = √(L0 / (2nL))
- * @param {number} L0 - Deep water wavelength (m)
- * @param {number} L - Local wavelength (m)
- * @param {number} n - Group velocity factor
+ * Calculate shoaling coefficient between two water depths by energy-flux conservation:
+ * Ks = √((n1 × L1) / (n2 × L2))
+ * Defaults n1 = 0.5 (deep water), reducing to √(L0 / (2 × n2 × L2)).
+ * @param {number} L1 - Incident/deep water wavelength (m)
+ * @param {number} L2 - Target local wavelength (m)
+ * @param {number} n2 - Target group velocity factor
+ * @param {number} [n1=0.5] - Incident group velocity factor (0.5 for deep water)
  * @returns {number} Shoaling coefficient Ks
  */
-function calculateShoalingCoefficient(L0, L, n) {
-    const Ks = Math.sqrt(L0 / (2 * n * L));
-    return Ks;
+function calculateShoalingCoefficient(L1, L2, n2, n1 = 0.5) {
+    if (L1 <= 0 || L2 <= 0 || n2 <= 0 || n1 <= 0) return 1.0;
+    return Math.sqrt((n1 * L1) / (n2 * L2));
 }
 
 /**
@@ -135,8 +144,8 @@ function transformWaveOffshoreToToe(H0, T, d_offshore, d_toe, beta0 = 0) {
     const k_toe = (2 * Math.PI) / L_toe;
     const n_toe = calculateGroupVelocityFactor(k_toe, d_toe);
 
-    // 4. Calculate shoaling coefficient (offshore to toe)
-    const Ks = calculateShoalingCoefficient(L_offshore, L_toe, n_toe);
+    // 4. Calculate shoaling coefficient (offshore to toe using both group velocity factors)
+    const Ks = calculateShoalingCoefficient(L_offshore, L_toe, n_toe, n_offshore);
 
     // 5. Calculate refraction
     const beta_toe = calculateRefractionAngle(beta0, L_offshore, L_toe);
@@ -350,19 +359,41 @@ function analyzeWaveTransformationAndRunup(params) {
     };
 }
 
+/**
+ * Calculate depth-limited breaking wave height (Miche / McCowan criterion)
+ * @param {number} d - Water depth (m)
+ * @param {number} [gamma=0.78] - Breaker index
+ * @returns {number} Maximum breaking wave height (m)
+ */
+function calculateBreakingWaveHeight(d, gamma = 0.78) {
+    return d > 0 ? gamma * d : 0;
+}
+
 // Export functions for use in other modules
+const WaveTransformationAPI = {
+    calculateDeepWaterWavelength,
+    calculateLocalWavelength,
+    calculateWavelength: calculateLocalWavelength,
+    calculateGroupVelocityFactor,
+    calculateShoalingCoefficient,
+    calculateRefractionAngle,
+    calculateRefractionCoefficient,
+    calculateBreakingWaveHeight,
+    transformWaveOffshoreToToe,
+    transformWavesToToe: transformWaveOffshoreToToe,
+    calculateSurfSimilarity,
+    classifyBreakingType,
+    getWaveRegime: classifyBreakingType,
+    calculateWaveRunup,
+    calculateWaveRundown,
+    analyzeWaveTransformationAndRunup,
+    getRoughnessReductionFactor
+};
+
 if (typeof window !== 'undefined') {
-    window.WaveTransformation = {
-        calculateDeepWaterWavelength,
-        calculateLocalWavelength,
-        calculateShoalingCoefficient,
-        calculateRefractionCoefficient,
-        transformWaveOffshoreToToe,
-        calculateSurfSimilarity,
-        classifyBreakingType,
-        calculateWaveRunup,
-        calculateWaveRundown,
-        analyzeWaveTransformationAndRunup,
-        getRoughnessReductionFactor
-    };
+    window.WaveTransformation = WaveTransformationAPI;
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = WaveTransformationAPI;
 }

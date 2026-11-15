@@ -3,6 +3,19 @@
  * Handles the user interface for the Project Management system
  */
 
+const _escProjectHtml = (val) => {
+    if (typeof window !== 'undefined' && typeof window.escapeHtml === 'function') {
+        return window.escapeHtml(val);
+    }
+    if (val === null || val === undefined) return '';
+    return String(val)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+};
+
 class ProjectUIManager {
     constructor() {
         this.container = document.getElementById('projectsGrid');
@@ -15,33 +28,29 @@ class ProjectUIManager {
     init() {
         console.log('ProjectUIManager initializing...');
 
-        // Use event delegation since the button might be dynamically created
         document.addEventListener('click', (e) => {
-            // Check if the click is on the create button or its children
-            const createBtn = e.target.closest('#createNewProjectBtn');
+            const createBtn = e.target.closest('#createNewProjectBtn, .empty-create-project-btn');
             if (createBtn) {
                 e.preventDefault();
                 e.stopPropagation();
                 e.stopImmediatePropagation();
-                console.log('Create button clicked via delegation!');
                 this.showCreateProjectModal();
                 return false;
             }
-        }, true); // Use capture phase to intercept before other handlers
+        }, true);
 
         if (this.searchInput) {
             this.searchInput.addEventListener('input', (e) => this.renderProjects(e.target.value));
         }
 
-        // Listen for navigation to projects page
-        document.querySelectorAll('[data-navigate="projects"]').forEach(btn => {
+        document.querySelectorAll('[data-navigate="projects"], [data-navigate="dashboard"]').forEach(btn => {
             btn.addEventListener('click', () => {
-                this.renderProjects();
+                this.renderProjects(this.searchInput?.value || '');
             });
         });
 
-        // Initial render if we are on projects page (though default is dashboard)
-        if (document.getElementById('projects')?.classList.contains('active')) {
+        // Initial render whenever #projectsGrid is present in DOM (including Dashboard)
+        if (this.container) {
             this.renderProjects();
         }
     }
@@ -68,7 +77,7 @@ class ProjectUIManager {
 
         } catch (error) {
             console.error('Error rendering projects:', error);
-            this.container.innerHTML = `<div class="error-message">Error loading projects: ${error.message}</div>`;
+            this.container.innerHTML = `<div class="error-message">Error loading projects: ${_escProjectHtml(error.message)}</div>`;
         }
     }
 
@@ -79,18 +88,19 @@ class ProjectUIManager {
 
         const lastModified = new Date(project.dateModified).toLocaleDateString();
         const structureCount = project.structures ? project.structures.length : 0;
+        const safeStatus = _escProjectHtml(project.status || 'draft');
 
         div.innerHTML = `
             <div class="card-header">
                 <div class="feature-icon project-icon">📁</div>
                 <div class="card-actions">
-                    <button class="icon-btn delete-project" title="Delete Project">🗑️</button>
+                    <button type="button" class="icon-btn delete-project" title="Delete Project">🗑️</button>
                 </div>
             </div>
-            <h3>${project.name}</h3>
-            <p class="client-location">${project.client ? project.client : 'No Client'} • ${project.location ? project.location : 'No Location'}</p>
-            <p class="description">${project.description || 'No description'}</p>
-            
+            <h3>${_escProjectHtml(project.name)}</h3>
+            <p class="client-location">${_escProjectHtml(project.client || 'No Client')} • ${_escProjectHtml(project.location || 'No Location')}</p>
+            <p class="description">${_escProjectHtml(project.description || 'No description')}</p>
+
             <div class="card-meta">
                 <span class="meta-item">
                     <span class="label">Structures</span>
@@ -98,21 +108,20 @@ class ProjectUIManager {
                 </span>
                 <span class="meta-item">
                     <span class="label">Last Modified</span>
-                    <span class="value">${lastModified}</span>
+                    <span class="value">${_escProjectHtml(lastModified)}</span>
                 </span>
             </div>
-            
-            <div class="status-badge ${project.status}">${project.status}</div>
+
+            <div class="status-badge ${safeStatus}">${safeStatus}</div>
         `;
 
-        // Handle delete specifically
         const deleteBtn = div.querySelector('.delete-project');
         if (deleteBtn) {
             deleteBtn.onclick = (e) => {
                 e.stopPropagation();
                 if (confirm(`Are you sure you want to delete "${project.name}"?`)) {
                     window.projectManager.deleteProject(project.id).then(() => {
-                        this.renderProjects(this.searchInput?.value);
+                        this.renderProjects(this.searchInput?.value || '');
                     });
                 }
             };
@@ -125,7 +134,7 @@ class ProjectUIManager {
         if (query) {
             this.container.innerHTML = `
                 <div class="empty-state">
-                    <p>No projects found matching "${query}"</p>
+                    <p>No projects found matching "${_escProjectHtml(query)}"</p>
                 </div>
             `;
         } else {
@@ -133,8 +142,8 @@ class ProjectUIManager {
                 <div class="empty-library-state">
                     <div class="empty-icon">📂</div>
                     <h3>No Projects Yet</h3>
-                    <p>Create a new project to start organizing your engineering designs.</p>
-                    <button class="btn-primary" onclick="document.getElementById('createNewProjectBtn').click()">
+                    <p>Create a new project to start organizing your coastal engineering designs.</p>
+                    <button type="button" class="btn-primary empty-create-project-btn">
                         Create New Project
                     </button>
                 </div>
@@ -144,20 +153,37 @@ class ProjectUIManager {
 
     async openProject(projectId) {
         try {
-            await window.projectManager.loadProject(projectId);
-            // Navigate to Dashboard or Project Overview
-            // For now, let's just show an alert or toast, and maybe navigate to Library (filtered?)
-            // Or better: Navigate to Dashboard which should now show Project Context
-
-            // Update Dashboard Context
+            const project = await window.projectManager.loadProject(projectId);
             this.updateDashboardContext();
 
-            // Navigate to dashboard
-            navigateToPage('dashboard');
+            if (project && window.AppState) {
+                window.AppState.projectData = {
+                    name: project.name || '',
+                    location: project.location || '',
+                    engineer: project.engineerName || '',
+                    company: project.companyName || ''
+                };
+                if (project.waveAnalysis) {
+                    window.AppState.waveData = project.waveAnalysis;
+                }
+                const setVal = (id, val) => {
+                    const el = document.getElementById(id);
+                    if (el && val) el.value = val;
+                };
+                setVal('projectName', project.name);
+                setVal('projectLocation', project.location);
+                setVal('engineerName', project.engineerName);
+                setVal('companyName', project.companyName);
+            }
 
+            if (typeof navigateToPage === 'function') {
+                navigateToPage('dashboard');
+            }
         } catch (error) {
             console.error('Error opening project:', error);
-            alert('Failed to open project');
+            if (typeof StructureLibrary !== 'undefined') {
+                StructureLibrary.showNotification('Failed to open project', 'error');
+            }
         }
     }
 
@@ -192,7 +218,7 @@ class ProjectUIManager {
     }
 
     refreshProjectList() {
-        this.renderProjects(this.searchInput?.value || '');
+        return this.renderProjects(this.searchInput?.value || '');
     }
 }
 

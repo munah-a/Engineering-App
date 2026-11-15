@@ -60,15 +60,34 @@
     <main class="main-container">
         <!-- Dashboard Page -->
         <div class="page active" id="dashboard">
-            <div class="page-header">
-                <h1>Welcome to CoastalEngineer Pro</h1>
-                <p>Advanced coastal structure design and analysis platform</p>
+            <div class="page-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
+                <div>
+                    <h1>Welcome to CoastalEngineer Pro</h1>
+                    <p>Advanced coastal structure design and analysis platform</p>
+                </div>
+                <div style="display:flex; gap:12px; flex-wrap:wrap;">
+                    <button class="btn-secondary" id="startProjectWizardBtn">🧙 Guided Project Wizard</button>
+                    <button class="btn-primary" id="createNewProjectBtn">+ New Project</button>
+                </div>
             </div>
 
-            <!-- Recent Projects Section -->
+            <!-- Engineering Projects Section -->
+            <div class="dashboard-section" id="projectsSection">
+                <div class="section-header" style="flex-wrap:wrap; gap:12px;">
+                    <h2>Engineering Projects</h2>
+                    <div class="search-bar" style="min-width:240px;">
+                        <input type="text" id="projectSearch" placeholder="Search projects...">
+                    </div>
+                </div>
+                <div class="projects-grid" id="projectsGrid">
+                    <!-- Dynamic projects rendered by ProjectUIManager -->
+                </div>
+            </div>
+
+            <!-- Recent Saved Structures Section -->
             <div class="dashboard-section">
                 <div class="section-header">
-                    <h2>Recent Projects</h2>
+                    <h2>Recent Saved Structures</h2>
                     <button class="btn-secondary" data-navigate="library">
                         View All
                         <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -82,14 +101,14 @@
                     <!-- Dynamic content will be inserted here -->
                     <div class="empty-library-state">
                         <div class="empty-icon">📚</div>
-                        <h3>No Projects Yet</h3>
-                        <p>Start by analyzing wave conditions for your project</p>
+                        <h3>No Saved Structures Yet</h3>
+                        <p>Start by designing a coastal structure or analyzing wave conditions</p>
                         <button class="btn-primary" data-navigate="wave-predictor">
                             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                                 <path d="M8 3V13M3 8H13" stroke="currentColor" stroke-width="2"
                                     stroke-linecap="round" />
                             </svg>
-                            Start New Project
+                            Analyze Wave Conditions
                         </button>
                     </div>
                 </div>
@@ -186,24 +205,24 @@
                             <label data-tooltip="wind-speed">Wind Speed (U₁₀) <span
                                     class="tooltip-icon">ⓘ</span></label>
                             <div class="input-with-unit">
-                                <input type="number" id="windSpeed" value="15" step="0.1">
-                                <span class="unit">m/s</span>
+                                <input type="number" id="windSpeed" value="15" step="0.1" data-unit-type="speed">
+                                <span class="unit" data-unit-type="speed">m/s</span>
                             </div>
                         </div>
                         <div class="form-group">
                             <label data-tooltip="fetch-length">Fetch Length (F) <span
                                     class="tooltip-icon">ⓘ</span></label>
                             <div class="input-with-unit">
-                                <input type="number" id="fetchLength" value="5000" step="100">
-                                <span class="unit">m</span>
+                                <input type="number" id="fetchLength" value="5000" step="100" data-unit-type="length">
+                                <span class="unit" data-unit-type="length">m</span>
                             </div>
                         </div>
                         <div class="form-group">
                             <label data-tooltip="offshore-depth">Offshore Depth (d₀) <span
                                     class="tooltip-icon">ⓘ</span></label>
                             <div class="input-with-unit">
-                                <input type="number" id="offshoreDepth" value="30" step="0.1">
-                                <span class="unit">m</span>
+                                <input type="number" id="offshoreDepth" value="30" step="0.1" data-unit-type="length">
+                                <span class="unit" data-unit-type="length">m</span>
                             </div>
                             <small class="help-text">Water depth where waves are generated</small>
                         </div>
@@ -211,8 +230,8 @@
                             <label data-tooltip="toe-depth">Toe Depth (d<sub>toe</sub>) <span
                                     class="tooltip-icon">ⓘ</span></label>
                             <div class="input-with-unit">
-                                <input type="number" id="toeDepthWave" value="5" step="0.1">
-                                <span class="unit">m</span>
+                                <input type="number" id="toeDepthWave" value="5" step="0.1" data-unit-type="length">
+                                <span class="unit" data-unit-type="length">m</span>
                             </div>
                             <small class="help-text">Water depth at structure toe</small>
                         </div>
@@ -220,8 +239,8 @@
                             <label data-tooltip="wave-angle">Wave Approach Angle (β₀) <span
                                     class="tooltip-icon">ⓘ</span></label>
                             <div class="input-with-unit">
-                                <input type="number" id="waveAngle" value="0" step="1" min="0" max="90">
-                                <span class="unit">°</span>
+                                <input type="number" id="waveAngle" value="0" step="1" min="0" max="90" data-unit-type="angle">
+                                <span class="unit" data-unit-type="angle">°</span>
                             </div>
                             <small class="help-text">0° = shore-normal, affects refraction</small>
                         </div>
@@ -249,30 +268,30 @@
                             <label data-tooltip="mean-sea-level">Mean Sea Level (MSL) <span
                                     class="tooltip-icon">ⓘ</span></label>
                             <div class="input-with-unit">
-                                <input type="number" id="msl" value="0" step="0.01">
-                                <span class="unit">m</span>
+                                <input type="number" id="msl" value="0" step="0.01" data-unit-type="length">
+                                <span class="unit" data-unit-type="length">m</span>
                             </div>
                         </div>
                         <div class="form-group">
                             <label data-tooltip="tidal-range">Tidal Range <span class="tooltip-icon">ⓘ</span></label>
                             <div class="input-with-unit">
-                                <input type="number" id="tidalRange" value="2.5" step="0.1">
-                                <span class="unit">m</span>
+                                <input type="number" id="tidalRange" value="2.5" step="0.1" data-unit-type="length">
+                                <span class="unit" data-unit-type="length">m</span>
                             </div>
                         </div>
                         <div class="form-group">
                             <label data-tooltip="sea-level-rise">Sea Level Rise (SLR) <span
                                     class="tooltip-icon">ⓘ</span></label>
                             <div class="input-with-unit">
-                                <input type="number" id="slr" value="0.5" step="0.1">
-                                <span class="unit">m</span>
+                                <input type="number" id="slr" value="0.5" step="0.1" data-unit-type="length">
+                                <span class="unit" data-unit-type="length">m</span>
                             </div>
                         </div>
                         <div class="form-group">
                             <label data-tooltip="wave-setup">Wave Setup (η) <span class="tooltip-icon">ⓘ</span></label>
                             <div class="input-with-unit">
-                                <input type="number" id="waveSetup" value="0" step="0.01" readonly>
-                                <span class="unit">m</span>
+                                <input type="number" id="waveSetup" value="0" step="0.01" readonly data-unit-type="length">
+                                <span class="unit" data-unit-type="length">m</span>
                             </div>
                             <small class="help-text">Calculated automatically</small>
                         </div>
@@ -385,6 +404,7 @@
                                 <option value="rubble-standard">🏔️ Standard Breakwater</option>
                                 <option value="rubble-bullnose">🧱 Rubble Mound with Bullnose</option>
                                 <option value="rubble-berm">🌊 Berm Breakwater</option>
+                                <option value="rubble-reef">🪸 Reef Breakwater</option>
                                 <option value="rubble-low">📉 Low-Crested</option>
                                 <option value="rubble-revetment">🏖️ Revetment</option>
                             </optgroup>
@@ -472,13 +492,16 @@
                         <select id="filterType">
                             <option value="all">All Types</option>
                             <option value="rubble-standard">Standard Rubble Mound</option>
+                            <option value="rubble-bullnose">Rubble Mound with Bullnose</option>
                             <option value="rubble-berm">Berm Breakwater</option>
                             <option value="rubble-reef">Reef Breakwater</option>
                             <option value="rubble-low">Low-Crested</option>
+                            <option value="rubble-revetment">Revetment</option>
                             <option value="vertical-wall">Vertical Wall</option>
                             <option value="vertical-composite">Composite</option>
                             <option value="vertical-caisson">Caisson</option>
                             <option value="vertical-perforated">Perforated</option>
+                            <option value="custom">Custom</option>
                         </select>
 
                         <select id="filterStatus">
@@ -555,25 +578,36 @@
                             <label data-tooltip="crest-freeboard">Crest Freeboard (Rc) <span
                                     class="tooltip-icon">ⓘ</span></label>
                             <div class="input-with-unit">
-                                <input type="number" id="freeboard" value="3.0" step="0.1">
-                                <span class="unit">m</span>
+                                <input type="number" id="freeboard" value="3.0" step="0.1" data-unit-type="length">
+                                <span class="unit" data-unit-type="length">m</span>
                             </div>
                         </div>
                         <div class="form-group">
                             <label data-tooltip="structure-slope">Slope Angle (α) <span
                                     class="tooltip-icon">ⓘ</span></label>
                             <div class="input-with-unit">
-                                <input type="number" id="slopeAngle" value="35" step="1">
-                                <span class="unit">°</span>
+                                <input type="number" id="slopeAngle" value="35" step="1" data-unit-type="angle">
+                                <span class="unit" data-unit-type="angle">°</span>
                             </div>
                         </div>
                         <div class="form-group">
                             <label data-tooltip="crest-width">Crest Width (Gc) <span
                                     class="tooltip-icon">ⓘ</span></label>
                             <div class="input-with-unit">
-                                <input type="number" id="crestWidth" value="5.0" step="0.1">
-                                <span class="unit">m</span>
+                                <input type="number" id="crestWidth" value="5.0" step="0.1" data-unit-type="length">
+                                <span class="unit" data-unit-type="length">m</span>
                             </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="surfaceRoughness">Surface Roughness (γ<sub>f</sub>)</label>
+                            <select id="surfaceRoughness">
+                                <option value="1.0">Smooth Impermeable / Concrete (γf = 1.00)</option>
+                                <option value="0.60">1-Layer Rock Armour (γf = 0.60)</option>
+                                <option value="0.55" selected>2-Layer Rock Armour — permeable (γf = 0.55)</option>
+                                <option value="0.47">Concrete Cube (2-Layer) (γf = 0.47)</option>
+                                <option value="0.46">Accropode / Xbloc (1-Layer) (γf = 0.46)</option>
+                                <option value="0.38">Tetrapod (2-Layer) (γf = 0.38)</option>
+                            </select>
                         </div>
                     </div>
 
@@ -583,22 +617,22 @@
                             <label data-tooltip="significant-wave-height">Significant Wave Height (Hm0) <span
                                     class="tooltip-icon">ⓘ</span></label>
                             <div class="input-with-unit">
-                                <input type="number" id="waveHeight" value="2.5" step="0.1">
-                                <span class="unit">m</span>
+                                <input type="number" id="waveHeight" value="2.5" step="0.1" data-unit-type="length">
+                                <span class="unit" data-unit-type="length">m</span>
                             </div>
                         </div>
                         <div class="form-group">
                             <label>Mean Wave Period (Tm)</label>
                             <div class="input-with-unit">
-                                <input type="number" id="wavePeriod" value="8.0" step="0.1">
-                                <span class="unit">s</span>
+                                <input type="number" id="wavePeriod" value="8.0" step="0.1" data-unit-type="time">
+                                <span class="unit" data-unit-type="time">s</span>
                             </div>
                         </div>
                         <div class="form-group">
                             <label>Water Depth at Toe</label>
                             <div class="input-with-unit">
-                                <input type="number" id="toeDepth" value="10.0" step="0.1">
-                                <span class="unit">m</span>
+                                <input type="number" id="toeDepth" value="10.0" step="0.1" data-unit-type="length">
+                                <span class="unit" data-unit-type="length">m</span>
                             </div>
                         </div>
                     </div>
@@ -794,6 +828,50 @@
                         <span>Imperial</span>
                     </label>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Save to Library Modal -->
+    <div class="modal" id="saveLibraryModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Save Structure to Library</h2>
+                <button class="modal-close" id="closeSaveLibraryModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="saveStructName">Structure Name *</label>
+                    <input type="text" id="saveStructName" placeholder="e.g., Main Rubblemound Breakwater" value="My Coastal Structure">
+                </div>
+                <div class="form-group">
+                    <label for="saveStructProject">Project Name (optional)</label>
+                    <input type="text" id="saveStructProject" placeholder="e.g., Harbour Development Phase 1">
+                </div>
+                <div class="form-group">
+                    <label for="saveStructLocation">Location (optional)</label>
+                    <input type="text" id="saveStructLocation" placeholder="e.g., Male Atoll">
+                </div>
+                <div class="form-group">
+                    <label for="saveStructDesc">Description (optional)</label>
+                    <textarea id="saveStructDesc" rows="2" placeholder="Design notes or cross-section summary"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="saveStructTags">Tags (comma-separated, optional)</label>
+                    <input type="text" id="saveStructTags" placeholder="e.g., harbour, primary, 2026">
+                </div>
+                <div class="form-group">
+                    <label for="saveStructStatus">Status</label>
+                    <select id="saveStructStatus">
+                        <option value="draft" selected>Draft</option>
+                        <option value="approved">Approved</option>
+                        <option value="archived">Archived</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:12px; padding:16px 24px; border-top:1px solid var(--border-color);">
+                <button type="button" class="btn-secondary" id="cancelSaveLibraryBtn">Cancel</button>
+                <button type="button" class="btn-primary" id="confirmSaveLibraryBtn">Save Structure</button>
             </div>
         </div>
     </div>

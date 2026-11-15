@@ -1,0 +1,14 @@
+# OS & Editor files
+.DS_Store
+Thumbs.db
+.vscode/
+
+# Dependencies & Logs
+node_modules/
+*.log
+.env*
+
+# Local Agent Config & Pages Build Output
+.gemini/
+_site/
+

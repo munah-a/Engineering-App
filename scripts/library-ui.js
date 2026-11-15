@@ -177,21 +177,23 @@ function createStructureCard(structure) {
     const typeIcon = getTypeIcon(structure.type);
     const formattedDate = formatDate(structure.dateModified);
     const typeName = formatTypeName(structure.type);
+    const safeName = escapeHtml(structure.name || 'Untitled Structure');
+    const safeStatus = escapeHtml(structure.status || 'draft');
 
     card.innerHTML = `
         <div class="structure-thumbnail">
             ${structure.thumbnail
-            ? `<img src="${structure.thumbnail}" alt="${structure.name}">`
+            ? `<img src="${escapeHtml(structure.thumbnail)}" alt="${safeName}">`
             : `<div class="structure-thumbnail-placeholder">${typeIcon}</div>`
         }
         </div>
         <div class="structure-info">
             <div class="structure-header">
                 <div>
-                    <div class="structure-name">${escapeHtml(structure.name)}</div>
-                    <div class="structure-type">${typeName}</div>
+                    <div class="structure-name">${safeName}</div>
+                    <div class="structure-type">${escapeHtml(typeName)}</div>
                 </div>
-                <span class="structure-status ${structure.status}">${structure.status}</span>
+                <span class="structure-status ${safeStatus}">${safeStatus}</span>
             </div>
             ${structure.projectName ? `
                 <div class="structure-details">
@@ -208,31 +210,31 @@ function createStructureCard(structure) {
                 </div>
             ` : ''}
             <div class="structure-meta">
-                <span>Modified: ${formattedDate}</span>
+                <span>Modified: ${escapeHtml(formattedDate)}</span>
                 <span>v${structure.version || 1}</span>
             </div>
         </div>
         <div class="structure-actions">
-            <button class="structure-action-btn" onclick="loadStructureForEditing(${structure.id})">
+            <button type="button" class="structure-action-btn" data-action="edit">
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                     <path d="M10 1L13 4L5 12H2V9L10 1Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
                 Edit
             </button>
-            <button class="structure-action-btn" onclick="duplicateStructureById(${structure.id})">
+            <button type="button" class="structure-action-btn" data-action="duplicate">
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                     <rect x="3" y="3" width="8" height="8" stroke="currentColor" stroke-width="1.5" rx="1"/>
                     <path d="M5 3V2C5 1.44772 5.44772 1 6 1H12C12.5523 1 13 1.44772 13 2V8C13 8.55228 12.5523 9 12 9H11" stroke="currentColor" stroke-width="1.5"/>
                 </svg>
                 Copy
             </button>
-            <button class="structure-action-btn" onclick="exportStructureById(${structure.id})">
+            <button type="button" class="structure-action-btn" data-action="export">
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                     <path d="M7 9V2M7 9L4 6M7 9L10 6M2 12H12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
                 </svg>
                 Export
             </button>
-            <button class="structure-action-btn danger" onclick="deleteStructureById(${structure.id})">
+            <button type="button" class="structure-action-btn danger" data-action="delete">
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                     <path d="M2 4H12M5 4V2.5C5 2.22386 5.22386 2 5.5 2H8.5C8.77614 2 9 2.22386 9 2.5V4M5.5 7V10M8.5 7V10M3 4L3.5 11.5C3.5 11.7761 3.72386 12 4 12H10C10.2761 12 10.5 11.7761 10.5 11.5L11 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
                 </svg>
@@ -241,6 +243,11 @@ function createStructureCard(structure) {
         </div>
     `;
 
+    card.querySelector('[data-action="edit"]')?.addEventListener('click', () => loadStructureForEditing(structure.id));
+    card.querySelector('[data-action="duplicate"]')?.addEventListener('click', () => duplicateStructureById(structure.id));
+    card.querySelector('[data-action="export"]')?.addEventListener('click', () => exportStructureById(structure.id));
+    card.querySelector('[data-action="delete"]')?.addEventListener('click', () => deleteStructureById(structure.id));
+
     return card;
 }
 
@@ -248,51 +255,71 @@ function createStructureCard(structure) {
 // STRUCTURE ACTIONS
 // ==========================================
 function createNewStructure() {
-    // Navigate to designer page
     navigateToPage('designer');
 
-    // Reset designer to fresh state
     if (typeof loadTemplate === 'function') {
         loadTemplate('rubble-standard');
     }
 
-    // Show notification
     StructureLibrary.showNotification('Create your structure and use "Save to Library" button', 'info');
 }
 
 async function loadStructureForEditing(id) {
     try {
-        const structure = await StructureLibrary.getStructureById(id);
+        const lookupId = (typeof id === 'string' && /^\d+$/.test(id)) ? Number(id) : id;
+        const structure = await StructureLibrary.getStructureById(lookupId);
         if (!structure) {
             StructureLibrary.showNotification('Structure not found', 'error');
             return;
         }
 
-        // Load structure into designer
         if (window.AppState) {
             window.AppState.selectedTemplate = structure.type;
-            window.AppState.structureData = structure;
         }
 
-        // Navigate to designer
         navigateToPage('designer');
 
-        // Load template with structure data
         if (typeof loadTemplate === 'function') {
             loadTemplate(structure.type);
         }
 
-        // Populate form fields with structure dimensions
-        setTimeout(() => {
-            if (structure.dimensions) {
-                Object.keys(structure.dimensions).forEach(key => {
-                    const input = document.getElementById(key);
-                    if (input) {
-                        input.value = structure.dimensions[key];
+        if (structure.dimensions) {
+            const sys = window.AppState?.unitSystem || 'metric';
+            Object.entries(structure.dimensions).forEach(([key, val]) => {
+                const input = typeof getDesignInput === 'function'
+                    ? getDesignInput(key)
+                    : (document.getElementById(`design_${key}`) || document.getElementById(key));
+                if (!input) return;
+
+                if (input.type === 'checkbox') {
+                    input.checked = Boolean(val);
+                } else if (input.tagName === 'SELECT') {
+                    input.value = String(val);
+                } else {
+                    const numSI = parseFloat(val);
+                    if (Number.isFinite(numSI)) {
+                        const unitType = input.dataset.unitType || 'dimensionless';
+                        input.dataset.siValue = String(numSI);
+                        input.value = (sys === 'imperial' && typeof UnitConverter !== 'undefined')
+                            ? String(parseFloat(UnitConverter.fromSI(numSI, unitType, 'imperial').toFixed(3)))
+                            : String(numSI);
                     }
-                });
+                }
+            });
+
+            // Trigger derived display updates without resetting custom armour props
+            const dnInput = typeof getDesignInput === 'function' ? getDesignInput('armourDn50') : null;
+            if (dnInput) {
+                dnInput.dispatchEvent(new Event('change'));
             }
-        }, 200);
+        }
+
+        if (typeof drawStructureOnCanvas === 'function') {
+            drawStructureOnCanvas(structure.type);
+        }
+        if (typeof performStructureAnalysis === 'function') {
+            performStructureAnalysis();
+        }
 
         StructureLibrary.showNotification(`Loaded: ${structure.name}`, 'success');
     } catch (error) {
@@ -360,19 +387,22 @@ async function handleImport(event) {
 function getTypeIcon(type) {
     const icons = {
         'rubble-standard': '🏔️',
+        'rubble-bullnose': '🧱',
         'rubble-berm': '🌊',
         'rubble-reef': '🪸',
         'rubble-low': '📉',
+        'rubble-revetment': '🏖️',
         'vertical-wall': '🏢',
         'vertical-composite': '🏗️',
         'vertical-caisson': '📦',
-        'vertical-perforated': '⬜'
+        'vertical-perforated': '⬜',
+        'custom': '✏️'
     };
     return icons[type] || '🏗️';
 }
 
 function formatTypeName(type) {
-    return type
+    return (type || 'structure')
         .split('-')
         .map(word => word.charAt(0).toUpperCase() + word.slice(1))
         .join(' ');
@@ -380,6 +410,7 @@ function formatTypeName(type) {
 
 function formatDate(dateString) {
     const date = new Date(dateString);
+    if (Number.isNaN(date.getTime())) return 'Recent';
     const now = new Date();
     const diffMs = now - date;
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
@@ -396,9 +427,13 @@ function formatDate(dateString) {
 }
 
 function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
+    if (text === null || text === undefined) return '';
+    return String(text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 }
 
 function debounce(func, wait) {
@@ -416,60 +451,143 @@ function debounce(func, wait) {
 // ==========================================
 // SAVE CURRENT STRUCTURE TO LIBRARY
 // ==========================================
-async function saveCurrentStructureToLibrary() {
-    // Gather current structure data from designer
-    const templateType = window.AppState?.selectedTemplate || 'rubble-standard';
-
-    // Collect dimensions from input fields
+function _collectDesignerDimensionsSI() {
     const dimensions = {};
     const paramInputs = document.getElementById('parameterInputs');
-    if (paramInputs) {
-        paramInputs.querySelectorAll('input[type="number"]').forEach(input => {
-            dimensions[input.id] = parseFloat(input.value) || 0;
-        });
-    }
+    if (!paramInputs) return dimensions;
 
-    // Prompt for structure details
-    const name = prompt('Enter structure name:', 'My Coastal Structure');
-    if (!name) return; // User cancelled
+    const sys = window.AppState?.unitSystem || 'metric';
+    paramInputs.querySelectorAll('[data-param-id]').forEach(ctrl => {
+        const paramId = ctrl.dataset.paramId;
+        if (!paramId) return;
 
-    const projectName = prompt('Enter project name (optional):') || '';
-    const location = prompt('Enter location (optional):') || '';
+        if (ctrl.type === 'checkbox') {
+            dimensions[paramId] = Boolean(ctrl.checked);
+        } else if (ctrl.tagName === 'SELECT') {
+            dimensions[paramId] = ctrl.value;
+        } else if (!ctrl.readOnly) {
+            if (ctrl.dataset.siValue !== undefined && ctrl.dataset.siValue !== '') {
+                const cached = parseFloat(ctrl.dataset.siValue);
+                if (Number.isFinite(cached)) {
+                    dimensions[paramId] = cached;
+                    return;
+                }
+            }
+            const raw = parseFloat(ctrl.value);
+            if (Number.isFinite(raw)) {
+                const unitType = ctrl.dataset.unitType || 'dimensionless';
+                dimensions[paramId] = typeof UnitConverter !== 'undefined'
+                    ? UnitConverter.toSI(raw, unitType, sys)
+                    : raw;
+            }
+        }
+    });
 
-    // Create structure object
+    return dimensions;
+}
+
+async function saveCurrentStructureData(metadata = {}) {
+    const templateType = window.AppState?.selectedTemplate || 'rubble-standard';
+    const name = (metadata.name || '').trim() || 'My Coastal Structure';
+    const tags = Array.isArray(metadata.tags)
+        ? metadata.tags
+        : String(metadata.tags || '')
+            .split(',')
+            .map(t => t.trim())
+            .filter(Boolean);
+
+    const dimensions = _collectDesignerDimensionsSI();
     const structure = new StructureLibrary.CoastalStructure({
-        name: name,
+        name,
         type: templateType,
-        dimensions: dimensions,
-        projectName: projectName,
-        location: location,
-        status: 'draft'
+        dimensions,
+        projectName: (metadata.projectName || '').trim(),
+        location: (metadata.location || '').trim(),
+        description: (metadata.description || '').trim(),
+        tags,
+        status: metadata.status || 'draft'
     });
 
     try {
-        // Generate thumbnail from canvas if available
         const canvas = document.getElementById('designCanvas');
         if (canvas) {
             structure.thumbnail = canvas.toDataURL('image/png');
         }
 
-        // Save to library
         const id = await StructureLibrary.saveStructure(structure);
         StructureLibrary.showNotification('Structure saved to library!', 'success');
 
-        // Refresh library if on library page
         if (window.AppState?.currentPage === 'library') {
             await loadAndDisplayStructures();
         }
 
-        // Refresh dashboard recent projects
         if (typeof loadRecentProjects === 'function') {
-            loadRecentProjects();
+            await loadRecentProjects();
         }
+
+        return id;
     } catch (error) {
         console.error('Failed to save structure:', error);
         StructureLibrary.showNotification('Failed to save structure', 'error');
+        return null;
     }
+}
+
+function saveCurrentStructureToLibrary() {
+    const modal = document.getElementById('saveLibraryModal');
+    if (!modal) {
+        return saveCurrentStructureData({ name: 'My Coastal Structure' });
+    }
+
+    const currentProject = window.projectManager?.getCurrentProject?.();
+    const nameEl = document.getElementById('saveStructName');
+    const projEl = document.getElementById('saveStructProject');
+    const locEl = document.getElementById('saveStructLocation');
+    const descEl = document.getElementById('saveStructDesc');
+    const tagsEl = document.getElementById('saveStructTags');
+    const statusEl = document.getElementById('saveStructStatus');
+
+    if (nameEl && !nameEl.value.trim()) nameEl.value = 'My Coastal Structure';
+    if (projEl && currentProject?.name && !projEl.value) projEl.value = currentProject.name;
+    if (locEl && currentProject?.location && !locEl.value) locEl.value = currentProject.location;
+    if (descEl) descEl.value = '';
+    if (tagsEl) tagsEl.value = '';
+    if (statusEl) statusEl.value = 'draft';
+
+    if (typeof openModal === 'function') {
+        openModal('saveLibraryModal');
+    } else {
+        modal.classList.add('active');
+    }
+    nameEl?.focus();
+}
+
+function _bindSaveLibraryModalEvents() {
+    const modal = document.getElementById('saveLibraryModal');
+    if (!modal || modal.dataset.bound === 'true') return;
+    modal.dataset.bound = 'true';
+
+    const closeSave = () => {
+        if (typeof closeModal === 'function') {
+            closeModal('saveLibraryModal');
+        } else {
+            modal.classList.remove('active');
+        }
+    };
+
+    document.getElementById('closeSaveLibraryModal')?.addEventListener('click', closeSave);
+    document.getElementById('cancelSaveLibraryBtn')?.addEventListener('click', closeSave);
+    document.getElementById('confirmSaveLibraryBtn')?.addEventListener('click', async () => {
+        const name = document.getElementById('saveStructName')?.value?.trim() || 'My Coastal Structure';
+        const projectName = document.getElementById('saveStructProject')?.value || '';
+        const location = document.getElementById('saveStructLocation')?.value || '';
+        const description = document.getElementById('saveStructDesc')?.value || '';
+        const tags = document.getElementById('saveStructTags')?.value || '';
+        const status = document.getElementById('saveStructStatus')?.value || 'draft';
+
+        await saveCurrentStructureData({ name, projectName, location, description, tags, status });
+        closeSave();
+    });
 }
 
 // ==========================================
@@ -482,9 +600,12 @@ window.duplicateStructureById = duplicateStructureById;
 window.exportStructureById = exportStructureById;
 window.deleteStructureById = deleteStructureById;
 window.saveCurrentStructureToLibrary = saveCurrentStructureToLibrary;
+window.saveCurrentStructureData = saveCurrentStructureData;
 
-// Initialize when page becomes active
+// Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
+    _bindSaveLibraryModalEvents();
+
     // Listen for navigation to library page
     const observer = new MutationObserver((mutations) => {
         mutations.forEach((mutation) => {
